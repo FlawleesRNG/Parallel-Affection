@@ -1,0 +1,32 @@
+[
+  {
+    "id": "lia_1",
+    "title": "Entre prateleiras",
+    "text": "Lia organiza uma pequena mesa de recomendações na livraria. Ela olha para você e pergunta que tipo de história você costuma procurar.",
+    "choices": [
+      {"id": "sincerity", "label": "Ser sincero: procuro histórias que me façam entender pessoas.", "effects": {"affinity": 2, "trust": 1, "respect": 1}},
+      {"id": "humor", "label": "Brincar que aceita qualquer livro com um bom café como marcador.", "effects": {"affinity": 1, "interest": 2, "respect": 1}},
+      {"id": "courage", "label": "Perguntar qual história ela gostaria de contar sobre si mesma.", "effects": {"trust": 2, "interest": 1, "respect": 1}}
+    ]
+  },
+  {
+    "id": "lia_2",
+    "title": "Fim de expediente",
+    "text": "No fim do dia, Lia parece distraída enquanto fecha a porta da livraria. Ela diz que está tudo bem, mas a voz não convence.",
+    "choices": [
+      {"id": "care", "label": "Perguntar com cuidado se ela gostaria de conversar enquanto caminham.", "effects": {"affinity": 2, "trust": 2, "respect": 1}, "unlockScene": "end_of_day"},
+      {"id": "empathy", "label": "Perceber que Lia está preocupada e perguntar o que aconteceu.", "requirements": {"empathy": 3}, "effects": {"affinity": 2, "trust": 2, "interest": 1, "respect": 2}, "unlockScene": "end_of_day"},
+      {"id": "space", "label": "Oferecer companhia sem pressionar e respeitar o silêncio dela.", "effects": {"trust": 1, "respect": 3, "interest": 1}}
+    ]
+  },
+  {
+    "id": "lia_3",
+    "title": "Convite simples",
+    "text": "Alguns dias depois, Lia manda uma mensagem: um café novo abriu perto da praça. Ela pergunta se você gostaria de conhecer o lugar.",
+    "choices": [
+      {"id": "warm", "label": "Aceitar e sugerir que cada um leve uma indicação de livro.", "effects": {"affinity": 3, "trust": 1, "interest": 2, "respect": 1}, "unlockScene": "first_date"},
+      {"id": "honest", "label": "Dizer que gostaria de ir porque a companhia dela deixa a semana melhor.", "effects": {"affinity": 2, "trust": 2, "interest": 3, "respect": 1}, "unlockScene": "first_date"},
+      {"id": "brave", "label": "Responder que aceita, mas só se ela escolher o doce da vez.", "requirements": {"courage": 2}, "effects": {"affinity": 2, "trust": 1, "interest": 3, "respect": 2}, "unlockScene": "first_date"}
+    ]
+  }
+]

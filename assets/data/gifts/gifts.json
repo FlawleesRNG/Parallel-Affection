@@ -1,0 +1,9 @@
+[
+  {"id":"cafe","name":"Café","ryomiMultiplier":2},
+  {"id":"chocolate","name":"Chocolate","ryomiMultiplier":2},
+  {"id":"livro","name":"Livro","ryomiMultiplier":2},
+  {"id":"vinil","name":"Disco de vinil","ryomiMultiplier":2},
+  {"id":"fones","name":"Fones de ouvido","ryomiMultiplier":2},
+  {"id":"cobre","name":"Acessório de cobre","ryomiMultiplier":2},
+  {"id":"misterioso","name":"Presente misterioso","ryomiMultiplier":1}
+]

@@ -1,0 +1,12 @@
+[
+  {"id":1,"name":"Desconhecida","pose":"ryomi_stage_01","expression":"neutral"},
+  {"id":2,"name":"Mal-entendido","pose":"ryomi_stage_01","expression":"playful"},
+  {"id":3,"name":"Conhecida","pose":"ryomi_stage_01","expression":"smiling","storyEpisodeId":"ryomi_after_hours"},
+  {"id":4,"name":"Colega","pose":"ryomi_stage_01","expression":"neutral"},
+  {"id":5,"name":"Amiga","pose":"ryomi_stage_01","expression":"smiling"},
+  {"id":6,"name":"Próxima","pose":"ryomi_stage_01","expression":"affectionate"},
+  {"id":7,"name":"Interessada","pose":"ryomi_stage_01","expression":"embarrassed"},
+  {"id":8,"name":"Encantada","pose":"ryomi_stage_01","expression":"affectionate"},
+  {"id":9,"name":"Apaixonada","pose":"ryomi_stage_01","expression":"affectionate"},
+  {"id":10,"name":"Pessoa especial","pose":"ryomi_stage_01","expression":"affectionate"}
+]
