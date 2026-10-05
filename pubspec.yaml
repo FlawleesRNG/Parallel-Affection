@@ -62,6 +62,7 @@ flutter:
   assets:
     - assets/data/
     - assets/images/
+    - assets/images/ui/parallel_affection_main_menu.jpeg
     - assets/images/characters/roxanne/poses/
     - assets/images/characters/roxanne/ui/
     - assets/images/characters/kai/poses/

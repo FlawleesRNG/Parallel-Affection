@@ -263,7 +263,9 @@ class _HudMetricsV3 {
         verticalPadding: spec.isMobile ? 6 : 7,
         gap: 4,
         iconGap: 4,
-        identityWidth: spec.isMobile ? 116 : 132,
+        // The identity contains a 28px medallion, gap and label. Keeping a
+        // small reserve prevents its Row from overflowing at 1024px.
+        identityWidth: spec.isMobile ? 120 : 142,
         moneyWidth: spec.isMobile ? 132 : 150,
         cherriesWidth: spec.isMobile ? 88 : 98,
         blocksWidth: spec.isMobile ? 92 : 98,

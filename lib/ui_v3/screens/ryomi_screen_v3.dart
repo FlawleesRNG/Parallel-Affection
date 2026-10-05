@@ -118,6 +118,7 @@ class _RyomiScreenV3State extends State<RyomiScreenV3> {
     final canonical = PlayableCharacterCatalog.canonicalId(id);
     if (_selectedCharacterId == canonical) return;
     setState(() => _selectedCharacterId = canonical);
+    _windowsController.showCharacterFallback(canonical);
     widget.layoutEditor?.selectCharacter(canonical);
   }
 }

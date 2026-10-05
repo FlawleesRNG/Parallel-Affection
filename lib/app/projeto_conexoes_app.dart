@@ -24,14 +24,14 @@ class _ProjetoConexoesAppState extends State<ProjetoConexoesApp> {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-    title: 'Projeto Conexões',
+    title: 'Parallel Affection',
     debugShowCheckedModeBanner: false,
     theme: ConnectionsThemeV3.applyTo(AppTheme.dark()),
     home: FutureBuilder<void>(
       future: _boot,
       builder: (context, snapshot) =>
           snapshot.connectionState == ConnectionState.done
-          ? TitleScreen(controller: controller)
+          ? MainMenuScreen(controller: controller)
           : const Scaffold(body: Center(child: CircularProgressIndicator())),
     ),
   );

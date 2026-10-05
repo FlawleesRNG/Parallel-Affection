@@ -100,6 +100,7 @@ class GameController extends ChangeNotifier {
   MigrationReport? _lastMigrationReport;
   bool _rootTimeInfinite = false;
   bool _rootCherriesInfinite = false;
+  bool _hasPersistedSave = false;
 
   IdleState get state => _state;
   SaveIndicatorPhase get savePhase => _savePhase;
@@ -123,6 +124,10 @@ class GameController extends ChangeNotifier {
   MigrationReport? get lastMigrationReport => _lastMigrationReport;
   bool get rootTimeInfinite => _rootTimeInfinite;
   bool get rootCherriesInfinite => _rootCherriesInfinite;
+
+  /// Whether this session started from a valid persisted gameplay save.
+  /// A fresh boot deliberately remains false until the player starts a game.
+  bool get hasPersistedSave => _hasPersistedSave;
 
   String _canonicalCharacterId(String id) =>
       PlayableCharacterCatalog.canonicalId(id);
@@ -160,6 +165,7 @@ class GameController extends ChangeNotifier {
       final migration = await _decodeSaveSafely(saved);
       _state = migration.state;
       _lastMigrationReport = migration.report;
+      _hasPersistedSave = !migration.report.recoveredFromInvalidSource;
       final unlockedJobsBeforeOffline = _unlockedJobIds(_state);
       final unlockedHobbiesBeforeOffline = _unlockedHobbyIds(_state);
       final result = _simulation.advance(_state, DateTime.now(), offline: true);
@@ -178,7 +184,10 @@ class GameController extends ChangeNotifier {
       );
       _offlineSummary = summary.hasChanges ? summary : null;
     }
-    await _save(quiet: true);
+    // Do not create a save just by opening the main menu. A save is written
+    // after a valid existing save is reconciled, or when New Game/gameplay
+    // explicitly creates progress.
+    if (_hasPersistedSave) await _save(quiet: true);
     notifyListeners();
   }
 
@@ -225,6 +234,7 @@ class GameController extends ChangeNotifier {
     _jobBoostWarnings.clear();
     _hobbyBoostWarnings.clear();
     await _save();
+    _hasPersistedSave = true;
     notifyListeners();
   }
 
@@ -239,7 +249,7 @@ class GameController extends ChangeNotifier {
     _jobBoostWarnings.clear();
     _hobbyBoostWarnings.clear();
     await _storage.clear();
-    await _save();
+    _hasPersistedSave = false;
     notifyListeners();
   }
 

@@ -138,7 +138,16 @@ class _GameWindowHeaderV3 extends StatelessWidget {
               ),
             ),
           ),
-          if (badge != null) ...[const SizedBox(width: 6), badge!],
+          if (badge != null) ...[
+            const SizedBox(width: 6),
+            // Compact windows may be only ~208px wide. The stage badge must
+            // yield horizontal room to the title and minimize control rather
+            // than forcing the header Row past its bounds.
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: compact ? 68 : 120),
+              child: badge!,
+            ),
+          ],
           for (final action in actions) action,
         ],
       ),

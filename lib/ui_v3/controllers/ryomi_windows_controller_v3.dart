@@ -1,25 +1,29 @@
 import 'package:flutter/foundation.dart';
 
+import '../../core/character_catalog.dart';
+import '../../services/conversation_dialogue_selector.dart';
 import '../dialogue/dialogue_message_v3.dart';
 import '../dialogue/dialogue_queue_v3.dart';
 import '../dialogue/ryomi_dialogue_catalog_v3.dart';
 
 class RyomiWindowsControllerV3 extends ChangeNotifier {
-  RyomiWindowsControllerV3()
+  RyomiWindowsControllerV3({ConversationDialogueSelector? conversationSelector})
     : dialogueQueue = DialogueQueueV3(
         initialMessage: RyomiDialogueCatalogV3.initial(),
-      ) {
+      ),
+      _conversationSelector =
+          conversationSelector ?? ConversationDialogueSelector() {
     dialogueQueue.addListener(notifyListeners);
   }
 
   final DialogueQueueV3 dialogueQueue;
+  final ConversationDialogueSelector _conversationSelector;
 
   bool relationshipOpen = true;
   bool objectivesExpanded = false;
   bool interactionOpen = true;
   bool dialogueOpen = true;
   bool hasUnreadDialogue = false;
-  int _talkSequence = 0;
   int _interactSequence = 0;
   int _idleSequence = 0;
 
@@ -94,9 +98,51 @@ class RyomiWindowsControllerV3 extends ChangeNotifier {
     notifyListeners();
   }
 
-  void showTalkDialogue(int relationshipStage) {
+  void showTalkDialogue({
+    required String characterId,
+    required int relationshipStage,
+  }) {
+    final canonicalId = PlayableCharacterCatalog.canonicalId(characterId);
+    final dialogue = _conversationSelector.select(
+      characterId: canonicalId,
+      stage: relationshipStage,
+    );
     dialogueQueue.showNow(
-      RyomiDialogueCatalogV3.talk(relationshipStage, _talkSequence++),
+      DialogueMessage.create(
+        id: dialogue.id,
+        characterId: canonicalId,
+        speakerName: PlayableCharacterCatalog.visibleName(canonicalId),
+        text: dialogue.text,
+        context: DialogueContext.talk,
+        relationshipStage: relationshipStage,
+      ),
+    );
+    _markUnreadWhenClosed();
+  }
+
+  String? lastConversationDialogueId({
+    required String characterId,
+    required int relationshipStage,
+  }) => _conversationSelector.lastDialogueIdFor(
+    characterId: characterId,
+    stage: relationshipStage,
+  );
+
+  void showCharacterFallback(String characterId) {
+    final canonicalId = PlayableCharacterCatalog.canonicalId(characterId);
+    if (canonicalId == PlayableCharacterIds.roxanne) return;
+    final dialogue = _conversationSelector.select(
+      characterId: canonicalId,
+      stage: 0,
+    );
+    dialogueQueue.showNow(
+      DialogueMessage.create(
+        id: '${canonicalId}_${dialogue.id}',
+        characterId: canonicalId,
+        speakerName: PlayableCharacterCatalog.visibleName(canonicalId),
+        text: dialogue.text,
+        context: DialogueContext.systemFallback,
+      ),
     );
     _markUnreadWhenClosed();
   }

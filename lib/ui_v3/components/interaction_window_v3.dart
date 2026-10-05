@@ -200,18 +200,24 @@ class _ActionsGridV3 extends StatelessWidget {
                 onPressed: talkRemaining > Duration.zero
                     ? null
                     : () async {
-                        final previousStage =
-                            controller.state.characters[characterId]!.stage;
+                        final beforeAction =
+                            controller.state.characters[characterId]!;
+                        final previousStage = beforeAction.stage;
                         await controller.talk(characterId);
-                        final currentStage =
-                            controller.state.characters[characterId]!.stage;
-                        if (characterId == PlayableCharacterIds.roxanne) {
-                          windowsController.showTalkDialogue(currentStage);
+                        final afterAction =
+                            controller.state.characters[characterId]!;
+                        final conversationSucceeded =
+                            afterAction.lastTalkAt != beforeAction.lastTalkAt;
+                        if (conversationSucceeded) {
+                          windowsController.showTalkDialogue(
+                            characterId: characterId,
+                            relationshipStage: previousStage,
+                          );
                         }
                         if (characterId == PlayableCharacterIds.roxanne &&
-                            currentStage > previousStage) {
+                            afterAction.stage > previousStage) {
                           windowsController.enqueueRelationshipAdvance(
-                            currentStage,
+                            afterAction.stage,
                           );
                         }
                         onNeedsRefresh();
