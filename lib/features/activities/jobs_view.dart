@@ -12,6 +12,7 @@ import '../../models/idle_models.dart';
 import '../../services/activity_runtime_service.dart';
 import '../../services/game_audio_hooks.dart';
 import '../../services/time_reservation_service.dart';
+import 'activity_upgrade_button.dart';
 
 enum _JobsFilter { all, active, available, locked, maximumLevel }
 
@@ -138,7 +139,10 @@ class _JobsViewState extends State<JobsView> {
                                           _confirmingBoostJobIds.remove(job.id),
                                     ),
                                     onBoostConfirm: () async {
-                                      await controller.purchaseJobBoost(job.id);
+                                      await controller.purchaseActivityUpgrade(
+                                        ActivityKind.job,
+                                        job.id,
+                                      );
                                       if (mounted) {
                                         setState(
                                           () => _confirmingBoostJobIds.remove(
@@ -594,135 +598,142 @@ class _JobCard extends StatelessWidget {
     return Semantics(
       label:
           '${job.displayName}, $status, nível ${progress.level}, cargo $currentRole',
-      child: Container(
-        padding: const EdgeInsets.all(13),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFFCF6),
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(
-            color: hasBoost ? const Color(0xFFCF963A) : const Color(0xFF5B4351),
-            width: hasBoost ? 1.9 : 1.5,
+      child: GestureDetector(
+        onTap: unlocked ? onToggle : null,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: const EdgeInsets.all(13),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFFCF6),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: hasBoost
+                  ? const Color(0xFFCF963A)
+                  : const Color(0xFF5B4351),
+              width: hasBoost ? 1.9 : 1.5,
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x405B4351),
+                blurRadius: 0,
+                offset: Offset(0, 5),
+              ),
+            ],
           ),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x405B4351),
-              blurRadius: 0,
-              offset: Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _JobIcon(id: job.id, accent: accent, active: active),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _JobTitle(job: job, progress: progress),
-                ),
-                _StatusBadge(label: status, color: _statusColor(status)),
-              ],
-            ),
-            const SizedBox(height: 9),
-            Text(
-              job.description,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFF75656E),
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                height: 1.2,
-              ),
-            ),
-            const SizedBox(height: 10),
-            _RolePanel(
-              current: 'NÍVEL ${progress.level} — ${currentRole.toUpperCase()}',
-              next: maximumLevel ? null : nextRole,
-              maximumLevel: maximumLevel,
-              accent: accent,
-            ),
-            if (recentlyUnlocked) ...[
-              const SizedBox(height: 9),
-              _UnlockedBanner(jobName: job.displayName, color: accent),
-            ],
-            if (feedback != null) ...[
-              const SizedBox(height: 9),
-              _JobFeedbackPanel(
-                feedback: feedback!,
-                job: job,
-                color: feedback!.hasLevelUp ? accent : const Color(0xFFCF963A),
-              ),
-            ],
-            const SizedBox(height: 10),
-            if (!unlocked)
-              _LockedJobSection(
-                job: job,
-                requirements: requirementEvaluation.requirements,
-              )
-            else ...[
-              _JobCycleSection(
-                job: job,
-                progress: progress,
-                state: state,
-                now: now,
-              ),
-              const SizedBox(height: 9),
-              _JobXpSection(job: job, progress: progress, accent: accent),
-              const SizedBox(height: 10),
-              _StatsGrid(
-                items: [
-                  ('Recompensa', NumberFormatter.money(income.round())),
-                  ('XP', maximumLevel ? 'Máximo' : '${job.xpPerCycle}/ciclo'),
-                  ('Duração', '${cycleDuration.inSeconds}s'),
-                  ('Tempo', active ? 'Reservado $reserved' : '$timeCost'),
-                  (
-                    'Renda',
-                    '${NumberFormatter.moneyDecimal(incomePerSecond)}/s',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _JobIcon(id: job.id, accent: accent, active: active),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _JobTitle(job: job, progress: progress),
                   ),
+                  _StatusBadge(label: status, color: _statusColor(status)),
+                  if (unlocked)
+                    ActivityUpgradeButton(
+                      activityName: job.displayName,
+                      activityKindLabel: 'Emprego',
+                      upgraded: progress.upgraded,
+                      canAfford:
+                          state.diamonds >=
+                          IdleBalance.activityUpgradeCherryCost,
+                      onConfirm: () async => onBoostConfirm(),
+                    ),
                 ],
               ),
+              const SizedBox(height: 9),
+              Text(
+                job.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF75656E),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  height: 1.2,
+                ),
+              ),
               const SizedBox(height: 10),
-              _EfficiencyPanel(job: job, progress: progress, state: state),
-            ],
-            if (timeWarning != null) ...[
-              const SizedBox(height: 9),
-              _InlineWarning(text: timeWarning!),
-            ] else if (unlocked && !active && !hasTime) ...[
-              const SizedBox(height: 9),
-              _InlineWarning(
-                text:
-                    'Precisa de $timeCost Tempo\nDisponível: ${time.available}',
+              _RolePanel(
+                current:
+                    'NÍVEL ${progress.level} — ${currentRole.toUpperCase()}',
+                next: maximumLevel ? null : nextRole,
+                maximumLevel: maximumLevel,
+                accent: accent,
+              ),
+              if (recentlyUnlocked) ...[
+                const SizedBox(height: 9),
+                _UnlockedBanner(jobName: job.displayName, color: accent),
+              ],
+              if (feedback != null) ...[
+                const SizedBox(height: 9),
+                _JobFeedbackPanel(
+                  feedback: feedback!,
+                  job: job,
+                  color: feedback!.hasLevelUp
+                      ? accent
+                      : const Color(0xFFCF963A),
+                ),
+              ],
+              const SizedBox(height: 10),
+              if (!unlocked)
+                _LockedJobSection(
+                  job: job,
+                  requirements: requirementEvaluation.requirements,
+                )
+              else ...[
+                _JobCycleSection(
+                  job: job,
+                  progress: progress,
+                  state: state,
+                  now: now,
+                ),
+                const SizedBox(height: 9),
+                _JobXpSection(job: job, progress: progress, accent: accent),
+                const SizedBox(height: 10),
+                _StatsGrid(
+                  items: [
+                    ('Recompensa', NumberFormatter.money(income.round())),
+                    ('XP', maximumLevel ? 'Máximo' : '${job.xpPerCycle}/ciclo'),
+                    ('Duração', '${cycleDuration.inSeconds}s'),
+                    ('Tempo', active ? 'Reservado $reserved' : '$timeCost'),
+                    (
+                      'Renda',
+                      '${NumberFormatter.moneyDecimal(incomePerSecond)}/s',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                _EfficiencyPanel(job: job, progress: progress, state: state),
+              ],
+              if (timeWarning != null) ...[
+                const SizedBox(height: 9),
+                _InlineWarning(text: timeWarning!),
+              ] else if (unlocked && !active && !hasTime) ...[
+                const SizedBox(height: 9),
+                _InlineWarning(
+                  text:
+                      'Precisa de $timeCost Tempo\nDisponível: ${time.available}',
+                ),
+              ],
+              const SizedBox(height: 4),
+              Text(
+                unlocked
+                    ? (active
+                          ? 'Toque no card para pausar'
+                          : 'Toque no card para iniciar')
+                    : 'Atividade bloqueada',
+                style: const TextStyle(
+                  color: Color(0xFF75656E),
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11,
+                ),
               ),
             ],
-            const SizedBox(height: 11),
-            _JobActionButton(
-              job: job,
-              active: active,
-              unlocked: unlocked,
-              hasTime: hasTime,
-              paused: paused,
-              timeCost: timeCost,
-              onPressed: unlocked && (active || hasTime) ? onToggle : null,
-            ),
-            if (unlocked) ...[
-              const SizedBox(height: 9),
-              _JobBoostPanel(
-                job: job,
-                progress: progress,
-                state: state,
-                now: now,
-                remaining: boostRemaining,
-                confirming: confirmingBoost,
-                warning: boostWarning,
-                onPrompt: onBoostPrompt,
-                onCancel: onBoostCancel,
-                onConfirm: onBoostConfirm,
-              ),
-            ],
-          ],
+          ),
         ),
       ),
     );
@@ -1128,6 +1139,7 @@ class _JobFeedbackPanel extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _JobActionButton extends StatelessWidget {
   const _JobActionButton({
     required this.job,
@@ -1196,6 +1208,7 @@ class _JobActionButton extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _JobBoostPanel extends StatelessWidget {
   const _JobBoostPanel({
     required this.job,

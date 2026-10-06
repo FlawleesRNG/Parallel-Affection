@@ -2,6 +2,7 @@ import '../core/character_catalog.dart';
 import '../core/idle_rules.dart';
 import '../core/player_skill_service.dart';
 import '../data/idle_balance.dart';
+import '../data/date_locations.dart';
 import '../models/idle_models.dart';
 import 'activity_runtime_service.dart';
 
@@ -310,26 +311,37 @@ class SimulationService {
     }
     state = state.copyWith(characters: passiveCharacters);
     if (state.activeEncounter case final encounter?) {
-      final definition = IdleBalance.encounter(encounter.encounterId);
-      if (nowMs - encounter.startedAt >= definition.seconds * 1000) {
+      final location = DateLocationCatalog.maybeById(encounter.locationId);
+      final endsAt = encounter.endsAt;
+      if (location == null) {
+        // Unknown IDs are discarded safely instead of crashing a recovered save.
+        state = state.copyWith(clearEncounter: true);
+      } else if (endsAt != null && nowMs >= endsAt) {
         final characters = {...state.characters};
         final characterId = PlayableCharacterCatalog.canonicalId(
           encounter.characterId,
         );
         final old = characters[characterId]!;
-        final updated = old.copyWith(
-          affection: old.affection + definition.affection,
-          lifetimeAffection: old.lifetimeAffection + definition.affection,
-          encounters: old.encounters + 1,
-          scenes: definition.stage >= 3
-              ? {...old.scenes, '${encounter.encounterId}_scene'}
-              : old.scenes,
-        );
+        final updated = old.copyWith(encounters: old.encounters + 1);
         characters[characterId] = updated;
         if (characterId == PlayableCharacterIds.roxanne) {
           characters[PlayableCharacterIds.legacyRyomi] = updated;
         }
-        state = state.copyWith(characters: characters, clearEncounter: true);
+        final progress = {
+          for (final entry in state.dateProgressByCharacter.entries)
+            entry.key: {...entry.value},
+        };
+        final characterProgress = {
+          ...(progress[characterId] ?? const <String, int>{}),
+        };
+        characterProgress[location.id] =
+            (characterProgress[location.id] ?? 0) + 1;
+        progress[characterId] = characterProgress;
+        state = state.copyWith(
+          characters: characters,
+          dateProgressByCharacter: progress,
+          clearEncounter: true,
+        );
       }
     }
     final before = state.characters.entries

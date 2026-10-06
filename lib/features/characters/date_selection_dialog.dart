@@ -1,120 +1,86 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../app/game_controller.dart';
+import '../../core/character_catalog.dart';
 import '../../core/number_formatter.dart';
 import '../../core/theme/game_tokens.dart';
-import '../../data/idle_balance.dart';
-import '../../core/character_catalog.dart';
-import '../../services/game_audio_hooks.dart';
-import '../../shared/game_ui.dart';
+import '../../data/character_routes.dart';
+import '../../data/date_locations.dart';
+import '../../models/idle_models.dart';
 
 Future<void> showDateSelectionDialog(
   BuildContext context,
   GameController controller, {
+  required String characterId,
   ValueChanged<ActionResult>? onStarted,
-}) {
-  if (MediaQuery.sizeOf(context).width < 600) {
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => FractionallySizedBox(
-        heightFactor: .92,
-        child: DateSelectionDialog(
-          controller: controller,
-          onStarted: onStarted,
-          embedded: true,
-        ),
-      ),
-    );
-  }
-  return showDialog<void>(
-    context: context,
-    barrierColor: GameColors.ink.withValues(alpha: .32),
-    builder: (_) =>
-        DateSelectionDialog(controller: controller, onStarted: onStarted),
-  );
-}
+}) => showDialog<void>(
+  context: context,
+  builder: (_) => DateSelectionDialog(
+    controller: controller,
+    characterId: characterId,
+    onStarted: onStarted,
+  ),
+);
 
 class DateSelectionDialog extends StatefulWidget {
   const DateSelectionDialog({
     super.key,
     required this.controller,
+    required this.characterId,
     this.onStarted,
-    this.embedded = false,
   });
-
   final GameController controller;
+  final String characterId;
   final ValueChanged<ActionResult>? onStarted;
-  final bool embedded;
-
   @override
   State<DateSelectionDialog> createState() => _DateSelectionDialogState();
 }
 
 class _DateSelectionDialogState extends State<DateSelectionDialog> {
-  String? busyId;
+  Timer? _timer;
+  bool _busy = false;
+  String? _message;
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(milliseconds: 200), (_) async {
+      await widget.controller.tick();
+      if (mounted) setState(() {});
+    });
+  }
 
-  static const accents = [
-    GameColors.coral,
-    GameColors.cyan,
-    GameColors.violet,
-    GameColors.orange,
-    GameColors.magenta,
-  ];
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final progress =
-        widget.controller.state.characters[PlayableCharacterIds.roxanne]!;
-    final content = ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 920, maxHeight: 700),
-      child: ColoredBox(
-        color: GameColors.paper,
-        child: Padding(
-          padding: const EdgeInsets.all(GameSpacing.lg),
-          child: Column(
-            children: [
-              Row(
+    final characterId = PlayableCharacterCatalog.canonicalId(
+      widget.characterId,
+    );
+    final active = widget.controller.state.activeEncounter;
+    return Dialog(
+      insetPadding: const EdgeInsets.all(18),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 920, maxHeight: 700),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 12, 8, 8),
+              child: Row(
                 children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [GameColors.violet, GameColors.peach],
-                      ),
-                      borderRadius: BorderRadius.circular(GameRadii.large),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: GameColors.brownShadow,
-                          blurRadius: 10,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.local_activity_rounded,
-                      color: GameColors.cream,
-                    ),
-                  ),
-                  const SizedBox(width: 11),
+                  const Icon(Icons.favorite_rounded, color: GameColors.coral),
+                  const SizedBox(width: 8),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Escolher encontro',
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                        const Text(
-                          'Siga a linha noturna e descubra novos lugares.',
-                          style: TextStyle(
-                            color: GameColors.softInk,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      active == null
+                          ? 'Escolher encontro'
+                          : 'Encontro acontecendo',
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
                   ),
                   IconButton(
@@ -124,308 +90,223 @@ class _DateSelectionDialogState extends State<DateSelectionDialog> {
                   ),
                 ],
               ),
-              const SizedBox(height: 11),
-              _MetroLine(stage: progress.stage, accents: accents),
-              const SizedBox(height: 12),
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) => GridView.builder(
-                    itemCount: IdleBalance.encounters.length,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: constraints.maxWidth >= 700 ? 2 : 1,
-                      crossAxisSpacing: 11,
-                      mainAxisSpacing: 11,
-                      childAspectRatio: constraints.maxWidth >= 700
-                          ? 2.65
-                          : 2.45,
-                    ),
-                    itemBuilder: (context, index) {
-                      final encounter = IdleBalance.encounters[index];
-                      final state = widget.controller.state;
-                      final stageOk = progress.stage >= encounter.stage;
-                      final moneyOk = state.money >= encounter.price;
-                      final blocksOk =
-                          state.availableBlocks >= encounter.blocks;
-                      final noActive = state.activeEncounter == null;
-                      final available =
-                          stageOk && moneyOk && blocksOk && noActive;
-                      final reason = !stageOk
-                          ? 'Estágio ${encounter.stage + 1} necessário'
-                          : !moneyOk
-                          ? 'Falta dinheiro'
-                          : !blocksOk
-                          ? 'Faltam blocos'
-                          : !noActive
-                          ? 'Encontro em andamento'
-                          : 'Disponível agora';
-                      return _DateCard(
-                        index: index,
-                        accent: accents[index],
-                        encounter: encounter,
-                        available: available,
-                        reason: reason,
-                        completedCount: progress.encounters,
-                        busy: busyId == encounter.id,
-                        onStart: () => _start(encounter.id),
-                      );
-                    },
-                  ),
+            ),
+            const Divider(height: 1),
+            if (_message != null)
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: Text(
+                  _message!,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
-            ],
-          ),
+            Expanded(
+              child: active == null
+                  ? _DateLocationsView(
+                      controller: widget.controller,
+                      characterId: characterId,
+                      busy: _busy,
+                      onStart: _start,
+                    )
+                  : _ActiveDateView(
+                      controller: widget.controller,
+                      active: active,
+                    ),
+            ),
+          ],
         ),
       ),
     );
-    if (widget.embedded) {
-      return ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
-        child: content,
-      );
-    }
-    return Dialog(insetPadding: const EdgeInsets.all(12), child: content);
   }
 
-  Future<void> _start(String id) async {
-    setState(() => busyId = id);
-    final result = await widget.controller.startEncounter(
-      PlayableCharacterIds.roxanne,
-      id,
+  Future<void> _start(String locationId) async {
+    setState(() => _busy = true);
+    final result = await widget.controller.startDate(
+      widget.characterId,
+      locationId,
     );
     if (!mounted) return;
-    setState(() => busyId = null);
-    GameAudioHooks.emit(GameAudioCue.encounter);
+    setState(() => _busy = false);
     widget.onStarted?.call(result);
-    if (widget.onStarted == null) showGameResult(context, result);
+    if (!result.message.contains('iniciado')) {
+      setState(() => _message = result.message);
+    }
   }
 }
 
-class _MetroLine extends StatelessWidget {
-  const _MetroLine({required this.stage, required this.accents});
-
-  final int stage;
-  final List<Color> accents;
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    height: 38,
-    child: Stack(
-      alignment: Alignment.center,
-      children: [
-        Positioned(
-          left: 24,
-          right: 24,
-          child: Container(
-            height: 4,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: accents),
-              borderRadius: BorderRadius.circular(GameRadii.pill),
-            ),
-          ),
-        ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(
-            5,
-            (index) => Container(
-              width: 27,
-              height: 27,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: stage >= IdleBalance.encounters[index].stage
-                    ? accents[index]
-                    : Colors.white,
-                shape: BoxShape.circle,
-                border: Border.all(color: accents[index], width: 2),
-                boxShadow: stage >= IdleBalance.encounters[index].stage
-                    ? [
-                        BoxShadow(
-                          color: accents[index].withValues(alpha: .5),
-                          blurRadius: 10,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Text(
-                '${index + 1}',
-                style: TextStyle(
-                  color: stage >= IdleBalance.encounters[index].stage
-                      ? Colors.white
-                      : GameColors.ink,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 10,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-class _DateCard extends StatelessWidget {
-  const _DateCard({
-    required this.index,
-    required this.accent,
-    required this.encounter,
-    required this.available,
-    required this.reason,
-    required this.completedCount,
+class _DateLocationsView extends StatelessWidget {
+  const _DateLocationsView({
+    required this.controller,
+    required this.characterId,
     required this.busy,
     required this.onStart,
   });
-
-  final int index;
-  final Color accent;
-  final EncounterDefinition encounter;
-  final bool available;
-  final String reason;
-  final int completedCount;
+  final GameController controller;
+  final String characterId;
   final bool busy;
-  final VoidCallback onStart;
-
+  final ValueChanged<String> onStart;
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          Colors.white.withValues(alpha: .94),
-          Color.lerp(accent, Colors.white, available ? .64 : .88)!,
-          GameColors.roseBeige,
-        ],
+  Widget build(BuildContext context) {
+    final character = PlayableCharacterCatalog.byId(characterId);
+    final stage = controller.state.characters[characterId]?.stage ?? 0;
+    final requirements = CharacterDateRequirements.forStage(characterId, stage);
+    return GridView.builder(
+      padding: const EdgeInsets.all(14),
+      itemCount: DateLocationCatalog.locations.length,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 410,
+        childAspectRatio: 1.75,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
       ),
-      borderRadius: BorderRadius.circular(GameRadii.large),
-      border: Border.all(
-        color: available ? accent : GameColors.cuteStroke,
-        width: available ? 2 : 1.2,
-      ),
-      boxShadow: available
-          ? [
-              BoxShadow(
-                color: accent.withValues(alpha: .18),
-                blurRadius: 14,
-                offset: const Offset(0, 6),
-              ),
-            ]
-          : const [
-              BoxShadow(
-                color: GameColors.brownShadow,
-                blurRadius: 10,
-                offset: Offset(0, 4),
-              ),
-            ],
-    ),
-    child: Row(
-      children: [
-        Container(
-          width: 64,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                accent.withValues(alpha: .82),
-                Color.lerp(accent, Colors.white, .38)!,
+      itemBuilder: (context, index) {
+        final location = DateLocationCatalog.locations[index];
+        final count = controller.dateCount(characterId, location.id);
+        final matches = requirements.where(
+          (item) => item.locationId == location.id,
+        );
+        final requirement = matches.isEmpty ? null : matches.first;
+        final afford = controller.state.money >= location.baseCost;
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                _DateArt(
+                  location: location,
+                  characterId: characterId,
+                  small: true,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          location.name,
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                        Text(
+                          '${NumberFormatter.money(location.baseCost)} • ${location.baseDuration.inSeconds}s',
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '${character.visibleName}: $count realizados',
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        if (requirement != null)
+                          Text(
+                            'REQUISITO ATUAL  $count/${requirement.requiredCount}${count >= requirement.requiredCount ? ' ✓' : ''}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        const SizedBox(height: 4),
+                        FilledButton(
+                          onPressed: busy || !afford
+                              ? null
+                              : () => onStart(location.id),
+                          child: Text(
+                            afford ? 'Iniciar' : 'Dinheiro insuficiente',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
-            borderRadius: BorderRadius.circular(GameRadii.large),
           ),
-          child: Icon(
-            available ? _placeIcon(index) : Icons.lock_rounded,
-            color: available ? GameColors.cream : GameColors.locked,
-            size: 30,
-          ),
-        ),
-        const SizedBox(width: 11),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                encounter.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: GameColors.ink,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 13,
-                ),
-              ),
-              const Spacer(),
-              Wrap(
-                spacing: 8,
-                runSpacing: 2,
-                children: [
-                  _MiniInfo(
-                    Icons.payments_rounded,
-                    NumberFormatter.money(encounter.price),
-                  ),
-                  _MiniInfo(Icons.schedule_rounded, '${encounter.seconds}s'),
-                  _MiniInfo(Icons.grid_view_rounded, '${encounter.blocks}'),
-                  _MiniInfo(Icons.favorite_rounded, '+${encounter.affection}'),
-                ],
-              ),
-              const SizedBox(height: 3),
-              Text(
-                '$reason • Encontros da rota: $completedCount',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: available ? accent : GameColors.locked,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 10,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 8),
-        FilledButton(
-          onPressed: available && !busy ? onStart : null,
-          style: FilledButton.styleFrom(
-            backgroundColor: accent,
-            foregroundColor: Colors.white,
-            elevation: 4,
-            shadowColor: accent.withValues(alpha: .25),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(GameRadii.pill),
-            ),
-          ),
-          child: Text(busy ? '...' : 'Ir'),
-        ),
-      ],
-    ),
-  );
-
-  IconData _placeIcon(int index) => switch (index) {
-    0 => Icons.coffee_rounded,
-    1 => Icons.location_city_rounded,
-    2 => Icons.mic_rounded,
-    3 => Icons.music_note_rounded,
-    _ => Icons.nightlife_rounded,
-  };
+        );
+      },
+    );
+  }
 }
 
-class _MiniInfo extends StatelessWidget {
-  const _MiniInfo(this.icon, this.label);
-  final IconData icon;
-  final String label;
-
+class _ActiveDateView extends StatelessWidget {
+  const _ActiveDateView({required this.controller, required this.active});
+  final GameController controller;
+  final ActiveEncounter active;
   @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Icon(icon, size: 12, color: GameColors.softInk),
-      const SizedBox(width: 2),
-      Text(
-        label,
-        style: const TextStyle(color: GameColors.softInk, fontSize: 10),
+  Widget build(BuildContext context) {
+    final location = DateLocationCatalog.byId(active.locationId);
+    final now = DateTime.now().toUtc().millisecondsSinceEpoch;
+    final end = active.endsAt ?? now;
+    final total = (end - active.startedAt).clamp(1, 1 << 30);
+    final factor = ((now - active.startedAt) / total).clamp(0.0, 1.0);
+    final remaining = Duration(milliseconds: (end - now).clamp(0, 1 << 30));
+    final character = PlayableCharacterCatalog.byId(active.characterId);
+    return Padding(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        children: [
+          Expanded(
+            child: _DateArt(
+              location: location,
+              characterId: active.characterId,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            '${character.visibleName} — ${location.name}',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 10),
+          LinearProgressIndicator(value: factor, minHeight: 12),
+          const SizedBox(height: 8),
+          Text('${remaining.inSeconds}s restantes'),
+        ],
       ),
-    ],
+    );
+  }
+}
+
+class _DateArt extends StatelessWidget {
+  const _DateArt({
+    required this.location,
+    required this.characterId,
+    this.small = false,
+  });
+  final DateLocationDefinition location;
+  final String characterId;
+  final bool small;
+  @override
+  Widget build(BuildContext context) => Container(
+    width: small ? 74 : double.infinity,
+    height: small ? double.infinity : null,
+    alignment: Alignment.center,
+    decoration: BoxDecoration(
+      color: GameColors.roseBeige,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Image.asset(
+      DateLocationCatalog.preferredImageAsset(characterId, location.id),
+      fit: BoxFit.cover,
+      errorBuilder: (_, error, stackTrace) => Image.asset(
+        location.imageAsset!,
+        fit: BoxFit.cover,
+        errorBuilder: (_, fallbackError, fallbackStackTrace) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(location.icon, size: small ? 32 : 80, color: GameColors.coral),
+            if (!small) ...[
+              const SizedBox(height: 10),
+              Text(
+                location.name,
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+              const Text(
+                'Arte do encontro será adicionada',
+                style: TextStyle(fontSize: 12),
+              ),
+            ],
+          ],
+        ),
+      ),
+    ),
   );
 }

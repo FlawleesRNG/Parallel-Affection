@@ -7,6 +7,8 @@ import '../core/idle_rules.dart';
 import '../core/job_requirement_evaluator.dart';
 import '../data/idle_balance.dart';
 import '../data/character_routes.dart';
+import '../data/character_unlocks.dart';
+import '../data/date_locations.dart';
 import '../models/idle_models.dart';
 import '../services/activity_runtime_service.dart';
 import '../services/game_storage.dart';
@@ -89,6 +91,7 @@ class GameController extends ChangeNotifier {
   Timer? _directClickSaveTimer;
   bool _directClickSavePending = false;
   bool _giftTransactionInFlight = false;
+  bool _dateTransactionInFlight = false;
   final Set<String> _recentlyUnlockedJobIds = {};
   final Set<String> _recentlyUnlockedHobbyIds = {};
   final Map<String, JobFeedbackRecord> _jobFeedbacks = {};
@@ -135,6 +138,8 @@ class GameController extends ChangeNotifier {
   CharacterProgress _characterProgress(String id) =>
       _state.characters[_canonicalCharacterId(id)]!;
 
+  bool _characterIsUnlocked(String id) => _characterProgress(id).unlocked;
+
   Map<String, CharacterProgress> _charactersWithProgress(
     String id,
     CharacterProgress progress,
@@ -165,6 +170,9 @@ class GameController extends ChangeNotifier {
       final migration = await _decodeSaveSafely(saved);
       _state = migration.state;
       _lastMigrationReport = migration.report;
+      if (migration.report.fromVersion < IdleSaveSchema.currentVersion) {
+        _applyRetroactiveProgressionRewards();
+      }
       _hasPersistedSave = !migration.report.recoveredFromInvalidSource;
       final unlockedJobsBeforeOffline = _unlockedJobIds(_state);
       final unlockedHobbiesBeforeOffline = _unlockedHobbyIds(_state);
@@ -440,6 +448,64 @@ class GameController extends ChangeNotifier {
     );
   }
 
+  /// Permanent, per-activity Alpha upgrade. The old temporary-boost APIs are
+  /// kept only for compatibility with historical saves and developer tests;
+  /// normal gameplay uses these methods exclusively.
+  Future<ActionResult> purchaseActivityUpgrade(
+    ActivityKind kind,
+    String id, {
+    bool free = false,
+  }) async {
+    await tick();
+    final activities = kind == ActivityKind.job ? _state.jobs : _state.hobbies;
+    final current = activities[id];
+    if (current == null) return const ActionResult('Atividade inexistente.');
+    if (!current.isUnlocked) return const ActionResult('Atividade bloqueada.');
+    if (current.upgraded)
+      return const ActionResult('Esta atividade já foi aprimorada.');
+    final effectiveFree = free || _rootCherriesInfinite;
+    const cost = IdleBalance.activityUpgradeCherryCost;
+    if (!effectiveFree && _state.diamonds < cost) {
+      return ActionResult('Cerejas insuficientes: ${_state.diamonds} / $cost.');
+    }
+    final updated = current.copyWith(upgraded: true);
+    _state = kind == ActivityKind.job
+        ? _state.copyWith(
+            diamonds: effectiveFree ? _state.diamonds : _state.diamonds - cost,
+            jobs: {..._state.jobs, id: updated},
+          )
+        : _state.copyWith(
+            diamonds: effectiveFree ? _state.diamonds : _state.diamonds - cost,
+            hobbies: {..._state.hobbies, id: updated},
+          );
+    await _save();
+    notifyListeners();
+    return ActionResult(
+      effectiveFree
+          ? 'DEV: atividade aprimorada permanentemente.'
+          : 'Aprimoramento permanente x2 adquirido por $cost Cerejas.',
+    );
+  }
+
+  Future<ActionResult> debugSetActivityUpgrade(
+    ActivityKind kind,
+    String id,
+    bool upgraded,
+  ) async {
+    final activities = kind == ActivityKind.job ? _state.jobs : _state.hobbies;
+    final current = activities[id];
+    if (current == null) return const ActionResult('Atividade inexistente.');
+    final updated = current.copyWith(upgraded: upgraded);
+    _state = kind == ActivityKind.job
+        ? _state.copyWith(jobs: {..._state.jobs, id: updated})
+        : _state.copyWith(hobbies: {..._state.hobbies, id: updated});
+    await _save();
+    notifyListeners();
+    return ActionResult(
+      'DEV: aprimoramento ${upgraded ? 'ativado' : 'removido'}.',
+    );
+  }
+
   Future<ActionResult> talk(String id) =>
       _affectionAction(id, cooldown: IdleBalance.talkCooldown, talk: true);
 
@@ -448,6 +514,9 @@ class GameController extends ChangeNotifier {
 
   Future<ActionResult> tapCharacter(String id) async {
     final characterId = _canonicalCharacterId(id);
+    if (!_characterIsUnlocked(characterId)) {
+      return ActionResult(CharacterUnlockCatalog.requirementText(characterId));
+    }
     final simulation = _simulation.advance(_state, DateTime.now());
     if (simulation.summary.hasChanges ||
         simulation.state.activeEncounter != _state.activeEncounter) {
@@ -462,7 +531,6 @@ class GameController extends ChangeNotifier {
     _state = _state.copyWith(
       characters: _charactersWithProgress(characterId, updated),
     );
-    _applyAutomaticStageAdvancements();
     _reconcileJobUnlocks();
     _scheduleDirectClickSave();
     notifyListeners();
@@ -475,6 +543,9 @@ class GameController extends ChangeNotifier {
     required bool talk,
   }) async {
     final characterId = _canonicalCharacterId(id);
+    if (!_characterIsUnlocked(characterId)) {
+      return ActionResult(CharacterUnlockCatalog.requirementText(characterId));
+    }
     await tick();
     final current = _characterProgress(characterId);
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -514,6 +585,11 @@ class GameController extends ChangeNotifier {
     _giftTransactionInFlight = true;
     try {
       characterId = _canonicalCharacterId(characterId);
+      if (!_characterIsUnlocked(characterId)) {
+        return ActionResult(
+          CharacterUnlockCatalog.requirementText(characterId),
+        );
+      }
       await tick();
       final gift = IdleBalance.gift(giftId);
       if (quantity <= 0) {
@@ -555,43 +631,75 @@ class GameController extends ChangeNotifier {
     }
   }
 
-  Future<ActionResult> startEncounter(
-    String characterId,
-    String encounterId,
-  ) async {
-    characterId = _canonicalCharacterId(characterId);
-    await tick();
-    if (_state.activeEncounter != null) {
-      return const ActionResult('Um encontro já está em andamento.');
+  Future<ActionResult> startEncounter(String characterId, String encounterId) =>
+      startDate(characterId, encounterId);
+
+  int dateCount(String characterId, String locationId) =>
+      _state.dateProgressByCharacter[_canonicalCharacterId(
+        characterId,
+      )]?[locationId] ??
+      0;
+
+  Duration dateDuration(DateLocationDefinition location) {
+    final multiplier = _state.speedMultiplier <= 0
+        ? 1.0
+        : _state.speedMultiplier;
+    final milliseconds = (location.baseDuration.inMilliseconds / multiplier)
+        .round();
+    return Duration(
+      milliseconds: milliseconds.clamp(1, location.baseDuration.inMilliseconds),
+    );
+  }
+
+  Future<ActionResult> startDate(String characterId, String locationId) async {
+    if (_dateTransactionInFlight) {
+      return const ActionResult('Um encontro já está sendo iniciado.');
     }
-    final item = IdleBalance.encounter(encounterId);
-    final character = _characterProgress(characterId);
-    if (character.stage < item.stage ||
-        _state.money < item.price ||
-        _state.availableBlocks < item.blocks) {
-      return const ActionResult(
-        'Requisitos do encontro ainda não foram atendidos.',
+    _dateTransactionInFlight = true;
+    try {
+      characterId = _canonicalCharacterId(characterId);
+      if (!_characterIsUnlocked(characterId)) {
+        return ActionResult(
+          CharacterUnlockCatalog.requirementText(characterId),
+        );
+      }
+      await tick();
+      if (_state.activeEncounter != null) {
+        return const ActionResult('Um encontro já está em andamento.');
+      }
+      final location = DateLocationCatalog.maybeById(locationId);
+      if (location == null)
+        return const ActionResult('Local de encontro inválido.');
+      if (_state.money < location.baseCost) {
+        return const ActionResult('Dinheiro insuficiente.');
+      }
+      final startedAt = DateTime.now().toUtc().millisecondsSinceEpoch;
+      final duration = dateDuration(location);
+      _state = _state.copyWith(
+        money: _state.money - location.baseCost,
+        activeEncounter: ActiveEncounter(
+          characterId: characterId,
+          encounterId: locationId,
+          startedAt: startedAt,
+          endsAt: startedAt + duration.inMilliseconds,
+          costPaid: location.baseCost,
+        ),
       );
+      await _save();
+      notifyListeners();
+      return ActionResult(
+        '${location.name} iniciado. O pagamento foi confirmado.',
+      );
+    } finally {
+      _dateTransactionInFlight = false;
     }
-    _state = _state.copyWith(
-      money: _state.money - item.price,
-      activeEncounter: ActiveEncounter(
-        characterId: characterId,
-        encounterId: encounterId,
-        startedAt: DateTime.now().millisecondsSinceEpoch,
-      ),
-    );
-    _applyAutomaticStageAdvancements();
-    _reconcileJobUnlocks();
-    await _save();
-    notifyListeners();
-    return ActionResult(
-      '${item.name} iniciado. Os blocos serão liberados ao concluir.',
-    );
   }
 
   Future<ActionResult> advanceStage(String id) async {
     id = _canonicalCharacterId(id);
+    if (!_characterIsUnlocked(id)) {
+      return ActionResult(CharacterUnlockCatalog.requirementText(id));
+    }
     await tick();
     if (!IdleRules.canAdvance(_state, id)) {
       return const ActionResult(
@@ -645,12 +753,59 @@ class GameController extends ChangeNotifier {
     );
   }
 
+  /// ROOT/DEV entry points deliberately reuse the persisted date state and the
+  /// same completion path as real gameplay.
+  Future<ActionResult> debugSetDateCount(
+    String characterId,
+    String locationId,
+    int value,
+  ) async {
+    characterId = _canonicalCharacterId(characterId);
+    if (DateLocationCatalog.maybeById(locationId) == null) {
+      return const ActionResult('Local de encontro inválido.');
+    }
+    final progress = {
+      for (final entry in _state.dateProgressByCharacter.entries)
+        entry.key: {...entry.value},
+    };
+    progress[characterId] = {
+      ...(progress[characterId] ?? const <String, int>{}),
+      locationId: value.clamp(0, 2147483647),
+    };
+    _state = _state.copyWith(dateProgressByCharacter: progress);
+    await _save();
+    notifyListeners();
+    return ActionResult(
+      '${DateLocationCatalog.byId(locationId).name}: ${progress[characterId]![locationId]}.',
+    );
+  }
+
+  Future<ActionResult> debugCompleteActiveDate() async {
+    final active = _state.activeEncounter;
+    if (active == null) return const ActionResult('Nenhum encontro ativo.');
+    _state = _state.copyWith(
+      activeEncounter: active.copyWith(
+        endsAt: DateTime.now().toUtc().millisecondsSinceEpoch - 1,
+      ),
+    );
+    await tick();
+    return const ActionResult('Encontro concluído.');
+  }
+
+  Future<ActionResult> debugClearActiveDate() async {
+    if (_state.activeEncounter == null)
+      return const ActionResult('Nenhum encontro ativo.');
+    _state = _state.copyWith(clearEncounter: true);
+    await _save();
+    notifyListeners();
+    return const ActionResult('Encontro ativo removido.');
+  }
+
   Future<void> debugMoney(int value) async {
     _state = _state.copyWith(
       money: _state.money + value,
       totalMoneyEarned: _state.totalMoneyEarned + value,
     );
-    _applyAutomaticStageAdvancements();
     _reconcileJobUnlocks();
     await _save();
     notifyListeners();
@@ -740,13 +895,64 @@ class GameController extends ChangeNotifier {
         ),
       ),
     );
-    _applyAutomaticStageAdvancements();
     _reconcileJobUnlocks();
     await _save();
     notifyListeners();
     return ActionResult(
       'DEV: ${PlayableCharacterCatalog.visibleName(characterId)} em '
       '${IdleRules.stageName(_characterProgress(characterId).stage)}.',
+    );
+  }
+
+  Future<ActionResult> debugSetCharacterUnlocked(
+    String characterId,
+    bool unlocked,
+  ) async {
+    characterId = _canonicalCharacterId(characterId);
+    if (characterId == PlayableCharacterIds.roxanne) unlocked = true;
+    final current = _characterProgress(characterId);
+    _state = _state.copyWith(
+      characters: _charactersWithProgress(
+        characterId,
+        current.copyWith(unlocked: unlocked),
+      ),
+    );
+    await _save();
+    notifyListeners();
+    return ActionResult(
+      'DEV: ${PlayableCharacterCatalog.visibleName(characterId)} ${unlocked ? 'desbloqueada' : 'bloqueada'}.',
+    );
+  }
+
+  Future<ActionResult> debugUnlockAllCharacters() async {
+    for (final character in PlayableCharacterCatalog.all) {
+      _state = _state.copyWith(
+        characters: _charactersWithProgress(
+          character.id,
+          _characterProgress(character.id).copyWith(unlocked: true),
+        ),
+      );
+    }
+    await _save();
+    notifyListeners();
+    return const ActionResult('DEV: todas as personagens desbloqueadas.');
+  }
+
+  Future<ActionResult> debugResetCharacterUnlocks() async {
+    var characters = {..._state.characters};
+    for (final character in PlayableCharacterCatalog.all) {
+      characters = _charactersWithProgress(
+        character.id,
+        _characterProgress(
+          character.id,
+        ).copyWith(unlocked: character.id == PlayableCharacterIds.roxanne),
+      );
+    }
+    _state = _state.copyWith(characters: characters);
+    await _save();
+    notifyListeners();
+    return const ActionResult(
+      'DEV: desbloqueios retornaram ao estado de Novo Jogo.',
     );
   }
 
@@ -771,7 +977,6 @@ class GameController extends ChangeNotifier {
         current.copyWith(giftDeliveries: deliveries),
       ),
     );
-    _applyAutomaticStageAdvancements();
     await _save();
     notifyListeners();
     return ActionResult(
@@ -1993,6 +2198,7 @@ class GameController extends ChangeNotifier {
   _AutomaticStageAdvanceSummary _applyAutomaticStageAdvancements() {
     final advanced = <_StageAdvanceOutcome>[];
     for (final route in CharacterRouteCatalog.all) {
+      if (!_characterIsUnlocked(route.characterId)) continue;
       var safety = IdleRules.totalRelationshipStages;
       while (safety > 0 && IdleRules.canAdvance(_state, route.characterId)) {
         advanced.add(_advanceStageInMemory(route.characterId));
@@ -2040,7 +2246,98 @@ class GameController extends ChangeNotifier {
       ),
       narrative: narrative,
     );
+    _awardOfficialProgression(id, nextStage);
     return _StageAdvanceOutcome(stage: nextStage, storyEpisodeId: episodeId);
+  }
+
+  void _awardOfficialProgression(String characterId, int reachedStage) {
+    final highest = _state.rewardedHighestStageByCharacter[characterId] ?? 0;
+    if (reachedStage > highest) {
+      _state = _state.copyWith(
+        totalBlocks: _state.totalBlocks + 1,
+        diamonds: _state.diamonds + 1 + (reachedStage == 9 ? 3 : 0),
+        rewardedHighestStageByCharacter: {
+          ..._state.rewardedHighestStageByCharacter,
+          characterId: reachedStage,
+        },
+        trueLoveRewardClaimed: reachedStage == 9
+            ? {..._state.trueLoveRewardClaimed, characterId}
+            : _state.trueLoveRewardClaimed,
+      );
+    }
+    _evaluateCharacterUnlocks();
+  }
+
+  void _evaluateCharacterUnlocks() {
+    final stages = <String, int>{
+      for (final definition in CharacterUnlockCatalog.definitions)
+        definition.characterId: _characterProgress(
+          definition.characterId,
+        ).stage,
+    };
+    var characters = {..._state.characters};
+    var diamonds = _state.diamonds;
+    final claimed = {..._state.characterUnlockRewardClaimed};
+    var changed = false;
+    for (final definition in CharacterUnlockCatalog.definitions) {
+      final current = characters[definition.characterId]!;
+      if (current.unlocked ||
+          !CharacterUnlockCatalog.isSatisfiedBy(definition, stages)) {
+        continue;
+      }
+      characters = _charactersWithProgress(
+        definition.characterId,
+        current.copyWith(unlocked: true),
+      );
+      if (!definition.initiallyUnlocked &&
+          claimed.add(definition.characterId)) {
+        diamonds += 2;
+      }
+      changed = true;
+    }
+    if (changed) {
+      _state = _state.copyWith(
+        characters: characters,
+        diamonds: diamonds,
+        characterUnlockRewardClaimed: claimed,
+      );
+    }
+  }
+
+  void _applyRetroactiveProgressionRewards() {
+    var blocks = _state.totalBlocks;
+    var diamonds = _state.diamonds;
+    final highest = {..._state.rewardedHighestStageByCharacter};
+    final trueLove = {..._state.trueLoveRewardClaimed};
+    final claimed = {..._state.characterUnlockRewardClaimed};
+    var characters = {..._state.characters};
+    for (final definition in CharacterUnlockCatalog.definitions) {
+      final current = characters[definition.characterId]!;
+      final stage = current.stage;
+      final rewarded = highest[definition.characterId] ?? 0;
+      if (stage > rewarded) {
+        blocks += stage - rewarded;
+        diamonds += stage - rewarded;
+        highest[definition.characterId] = stage;
+      }
+      if (stage >= 9 && trueLove.add(definition.characterId)) diamonds += 3;
+      if (!current.unlocked && (stage > 0 || definition.initiallyUnlocked)) {
+        characters[definition.characterId] = current.copyWith(unlocked: true);
+        if (!definition.initiallyUnlocked &&
+            claimed.add(definition.characterId)) {
+          diamonds += 2;
+        }
+      }
+    }
+    _state = _state.copyWith(
+      totalBlocks: blocks,
+      diamonds: diamonds,
+      rewardedHighestStageByCharacter: highest,
+      trueLoveRewardClaimed: trueLove,
+      characterUnlockRewardClaimed: claimed,
+      characters: characters,
+    );
+    _evaluateCharacterUnlocks();
   }
 
   int _passiveAffectionClockStartFor(int stage, int now) =>

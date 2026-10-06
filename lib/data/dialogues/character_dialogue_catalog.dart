@@ -1,4 +1,5 @@
 import '../../core/character_catalog.dart';
+import 'supporting_character_conversation_texts.dart';
 
 /// Static relationship dialogue content. Gameplay state never owns these texts.
 class ConversationDialogue {
@@ -14,8 +15,22 @@ abstract final class CharacterDialogueCatalog {
     text: 'Mais diálogos serão adicionados futuramente.',
   );
 
-  static const Map<String, Map<int, List<ConversationDialogue>>> conversations =
-      {PlayableCharacterIds.roxanne: _roxanneConversations};
+  static final Map<String, Map<int, List<ConversationDialogue>>> conversations =
+      {
+        PlayableCharacterIds.roxanne: _roxanneConversations,
+        PlayableCharacterIds.kai: _buildCharacterConversations(
+          PlayableCharacterIds.kai,
+          SupportingCharacterConversationTexts.kai,
+        ),
+        PlayableCharacterIds.sofia: _buildCharacterConversations(
+          PlayableCharacterIds.sofia,
+          SupportingCharacterConversationTexts.sofia,
+        ),
+        PlayableCharacterIds.astra: _buildCharacterConversations(
+          PlayableCharacterIds.astra,
+          SupportingCharacterConversationTexts.astra,
+        ),
+      };
 
   static List<ConversationDialogue> conversationPool(
     String characterId,
@@ -291,4 +306,18 @@ abstract final class CharacterDialogueCatalog {
       ),
     ],
   };
+
+  static Map<int, List<ConversationDialogue>> _buildCharacterConversations(
+    String characterId,
+    List<List<String>> stageTexts,
+  ) => Map<int, List<ConversationDialogue>>.unmodifiable({
+    for (var stage = 0; stage < stageTexts.length; stage++)
+      stage: List<ConversationDialogue>.unmodifiable([
+        for (var index = 0; index < stageTexts[stage].length; index++)
+          ConversationDialogue(
+            id: '${characterId}_stage_${(stage + 1).toString().padLeft(2, '0')}_dialogue_${(index + 1).toString().padLeft(2, '0')}',
+            text: stageTexts[stage][index],
+          ),
+      ]),
+  });
 }

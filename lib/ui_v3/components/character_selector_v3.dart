@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/character_catalog.dart';
 import '../../core/idle_rules.dart';
+import '../../data/character_unlocks.dart';
 import '../../models/idle_models.dart';
 import '../design/connections_colors_v3.dart';
 import '../design/connections_radius_v3.dart';
@@ -95,6 +96,7 @@ class CharacterSelectorV3 extends StatelessWidget {
       cards.add(
         CharacterSelectorCardV3(
           key: ValueKey('character_selector_${character.id}_v3'),
+          characterId: character.id,
           name: character.visibleName,
           stageLabel: character.routeReady
               ? IdleRules.stageName(progress.stage)
@@ -106,11 +108,14 @@ class CharacterSelectorV3 extends StatelessWidget {
                 )
               : 0,
           selected: selected,
+          locked: !progress.unlocked,
           assetPath: character.effectiveSelectorAsset,
           assetKey: ValueKey('character_selector_${character.id}_asset_v3'),
           height: height,
           accent: character.accent,
-          onTap: () => onSelected?.call(character.id),
+          onTap: progress.unlocked
+              ? () => onSelected?.call(character.id)
+              : null,
         ),
       );
       if (character != PlayableCharacterCatalog.all.last) {
@@ -162,6 +167,7 @@ class _CompactCharacterSelectorV3 extends StatelessWidget {
                   width: 158,
                   child: CharacterSelectorCardV3(
                     key: ValueKey('character_selector_${character.id}_v3'),
+                    characterId: character.id,
                     name: character.visibleName,
                     stageLabel: character.routeReady
                         ? IdleRules.stageName(progress.stage)
@@ -177,6 +183,7 @@ class _CompactCharacterSelectorV3 extends StatelessWidget {
                           selectedCharacterId,
                         ) ==
                         character.id,
+                    locked: !progress.unlocked,
                     assetPath: character.effectiveSelectorAsset,
                     assetKey: ValueKey(
                       'character_selector_${character.id}_asset_v3',
@@ -184,7 +191,9 @@ class _CompactCharacterSelectorV3 extends StatelessWidget {
                     compact: true,
                     height: 68,
                     accent: character.accent,
-                    onTap: () => onSelected?.call(character.id),
+                    onTap: progress.unlocked
+                        ? () => onSelected?.call(character.id)
+                        : null,
                   ),
                 );
               },
@@ -204,12 +213,14 @@ class _CompactCharacterSelectorV3 extends StatelessWidget {
 class CharacterSelectorCardV3 extends StatefulWidget {
   const CharacterSelectorCardV3({
     super.key,
+    required this.characterId,
     required this.name,
     required this.stageLabel,
     required this.routePercent,
     required this.assetPath,
     this.assetKey = const ValueKey('character_selector_asset_v3'),
     this.selected = false,
+    this.locked = false,
     this.compact = false,
     this.height = 96,
     this.notificationCount = 0,
@@ -218,11 +229,13 @@ class CharacterSelectorCardV3 extends StatefulWidget {
   });
 
   final String name;
+  final String characterId;
   final String stageLabel;
   final int routePercent;
   final String assetPath;
   final Key assetKey;
   final bool selected;
+  final bool locked;
   final bool compact;
   final double height;
   final int notificationCount;
@@ -265,18 +278,23 @@ class _CharacterSelectorCardV3State extends State<CharacterSelectorCardV3> {
         : ConnectionsColorsV3.outlineSoft.withValues(alpha: .44);
     final dx = _hovered ? 1.0 : 0.0;
     final dy = _pressed ? 1.0 : 0.0;
-    final semanticLabel =
-        '${widget.name}, ${widget.stageLabel}, progresso $effectivePercent por cento';
+    final semanticLabel = widget.locked
+        ? '${widget.name}, bloqueada. ${CharacterUnlockCatalog.requirementText(widget.characterId)}'
+        : '${widget.name}, ${widget.stageLabel}, progresso $effectivePercent por cento';
 
     return Tooltip(
-      message: '${widget.name} • ${widget.stageLabel} • $effectivePercent%',
+      message: widget.locked
+          ? CharacterUnlockCatalog.requirementText(widget.characterId)
+          : '${widget.name} • ${widget.stageLabel} • $effectivePercent%',
       child: Semantics(
         label: semanticLabel,
         button: true,
         selected: widget.selected,
         child: FocusableActionDetector(
           focusNode: _focusNode,
-          mouseCursor: SystemMouseCursors.click,
+          mouseCursor: widget.locked
+              ? SystemMouseCursors.forbidden
+              : SystemMouseCursors.click,
           onShowFocusHighlight: (focused) => setState(() => _focused = focused),
           onShowHoverHighlight: (hovered) => setState(() => _hovered = hovered),
           shortcuts: const {
@@ -385,6 +403,12 @@ class _CharacterSelectorCardV3State extends State<CharacterSelectorCardV3> {
                       ),
                     ),
                   ),
+                  if (widget.locked)
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: .48),
+                      ),
+                    ),
                   if (widget.selected)
                     Positioned(
                       key: const ValueKey('character_selector_selected_tab_v3'),
@@ -410,6 +434,14 @@ class _CharacterSelectorCardV3State extends State<CharacterSelectorCardV3> {
                             size: 14,
                           ),
                         ),
+                      ),
+                    ),
+                  if (widget.locked)
+                    const Center(
+                      child: Icon(
+                        Icons.lock_rounded,
+                        color: Colors.white,
+                        size: 30,
                       ),
                     ),
                   if (widget.selected || _focused)

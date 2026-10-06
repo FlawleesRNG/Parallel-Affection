@@ -104,6 +104,7 @@ void main() {
     final controller = GameController(_MemoryStorage());
     addTearDown(controller.dispose);
     await controller.initialize();
+    await controller.debugSetCharacterUnlocked('sofia', true);
 
     await controller.tapCharacter('sofia');
     expect(controller.state.characters['sofia']!.affection, 1);

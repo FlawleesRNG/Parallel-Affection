@@ -8,7 +8,7 @@ import 'narrative_models.dart';
 enum ActivityKind { job, hobby }
 
 abstract final class IdleSaveSchema {
-  static const int currentVersion = 7;
+  static const int currentVersion = 10;
 }
 
 class MigrationReport {
@@ -166,6 +166,7 @@ class ActivityProgress {
     this.isUnlocked = false,
     this.remainingBoostActiveTimeMs = 0,
     this.boostReferenceTimestampUtc = 0,
+    this.upgraded = false,
   });
   final int level;
   final int experience;
@@ -182,6 +183,9 @@ class ActivityProgress {
   final bool isUnlocked;
   final int remainingBoostActiveTimeMs;
   final int boostReferenceTimestampUtc;
+
+  /// Permanent individual cherry upgrade introduced for the Alpha.
+  final bool upgraded;
 
   Duration get remainingBoostActiveTime => Duration(
     milliseconds: remainingBoostActiveTimeMs.clamp(
@@ -218,6 +222,7 @@ class ActivityProgress {
     bool? isUnlocked,
     int? remainingBoostActiveTimeMs,
     int? boostReferenceTimestampUtc,
+    bool? upgraded,
   }) => ActivityProgress(
     level: level ?? this.level,
     experience: experience ?? this.experience,
@@ -237,6 +242,7 @@ class ActivityProgress {
         remainingBoostActiveTimeMs ?? this.remainingBoostActiveTimeMs,
     boostReferenceTimestampUtc:
         boostReferenceTimestampUtc ?? this.boostReferenceTimestampUtc,
+    upgraded: upgraded ?? this.upgraded,
   );
   Map<String, dynamic> toJson() => {
     'level': level,
@@ -254,6 +260,7 @@ class ActivityProgress {
     'isUnlocked': isUnlocked,
     'remainingBoostActiveTimeMs': remainingBoostActiveTimeMs,
     'boostReferenceTimestampUtc': boostReferenceTimestampUtc,
+    'upgraded': upgraded,
   };
   factory ActivityProgress.fromJson(
     Map<String, dynamic>? json,
@@ -297,6 +304,7 @@ class ActivityProgress {
       fallback: _readInt(json, 'remainingBoostActiveTime'),
     ),
     boostReferenceTimestampUtc: _readInt(json, 'boostReferenceTimestampUtc'),
+    upgraded: _readBool(json, 'upgraded'),
   );
 }
 
@@ -393,20 +401,44 @@ class ActiveEncounter {
     required this.characterId,
     required this.encounterId,
     required this.startedAt,
+    this.endsAt,
+    this.costPaid = 0,
   });
   final String characterId;
   final String encounterId;
   final int startedAt;
+
+  /// Null only for legacy encounter saves. New dates always write this.
+  final int? endsAt;
+  final int costPaid;
+  String get locationId => encounterId;
+  ActiveEncounter copyWith({
+    String? characterId,
+    String? encounterId,
+    int? startedAt,
+    int? endsAt,
+    int? costPaid,
+  }) => ActiveEncounter(
+    characterId: characterId ?? this.characterId,
+    encounterId: encounterId ?? this.encounterId,
+    startedAt: startedAt ?? this.startedAt,
+    endsAt: endsAt ?? this.endsAt,
+    costPaid: costPaid ?? this.costPaid,
+  );
   Map<String, dynamic> toJson() => {
     'characterId': characterId,
     'encounterId': encounterId,
     'startedAt': startedAt,
+    'endsAt': endsAt,
+    'costPaid': costPaid,
   };
   factory ActiveEncounter.fromJson(Map<String, dynamic> json) =>
       ActiveEncounter(
         characterId: json['characterId'] as String,
         encounterId: json['encounterId'] as String,
         startedAt: json['startedAt'] as int,
+        endsAt: _readInt(json, 'endsAt') > 0 ? _readInt(json, 'endsAt') : null,
+        costPaid: _readInt(json, 'costPaid'),
       );
 }
 
@@ -427,6 +459,10 @@ class IdleState {
     this.achievements = const {},
     this.narrative = const NarrativeProgress(),
     this.activeEncounter,
+    this.dateProgressByCharacter = const {},
+    this.rewardedHighestStageByCharacter = const {},
+    this.characterUnlockRewardClaimed = const {},
+    this.trueLoveRewardClaimed = const {},
   });
   final int money;
   final int diamonds;
@@ -443,6 +479,10 @@ class IdleState {
   final Set<String> achievements;
   final NarrativeProgress narrative;
   final ActiveEncounter? activeEncounter;
+  final Map<String, Map<String, int>> dateProgressByCharacter;
+  final Map<String, int> rewardedHighestStageByCharacter;
+  final Set<String> characterUnlockRewardClaimed;
+  final Set<String> trueLoveRewardClaimed;
   int get occupiedBlocks =>
       jobs.entries
           .where((item) => item.value.active)
@@ -458,9 +498,7 @@ class IdleState {
             (sum, item) =>
                 sum + IdleBalance.hobbyTimeCost(item.key, item.value.level),
           ) +
-      (activeEncounter == null
-          ? 0
-          : encounterBlockCost[activeEncounter!.encounterId]!);
+      (activeEncounter == null ? 0 : 0);
   int get availableBlocks {
     final available = totalBlocks - occupiedBlocks;
     return available < 0 ? 0 : available;
@@ -482,6 +520,10 @@ class IdleState {
     Set<String>? achievements,
     NarrativeProgress? narrative,
     ActiveEncounter? activeEncounter,
+    Map<String, Map<String, int>>? dateProgressByCharacter,
+    Map<String, int>? rewardedHighestStageByCharacter,
+    Set<String>? characterUnlockRewardClaimed,
+    Set<String>? trueLoveRewardClaimed,
     bool clearEncounter = false,
   }) => IdleState(
     money: money ?? this.money,
@@ -501,6 +543,13 @@ class IdleState {
     activeEncounter: clearEncounter
         ? null
         : activeEncounter ?? this.activeEncounter,
+    dateProgressByCharacter:
+        dateProgressByCharacter ?? this.dateProgressByCharacter,
+    rewardedHighestStageByCharacter:
+        rewardedHighestStageByCharacter ?? this.rewardedHighestStageByCharacter,
+    characterUnlockRewardClaimed:
+        characterUnlockRewardClaimed ?? this.characterUnlockRewardClaimed,
+    trueLoveRewardClaimed: trueLoveRewardClaimed ?? this.trueLoveRewardClaimed,
   );
 
   String encode() => jsonEncode({
@@ -520,6 +569,12 @@ class IdleState {
     'achievements': achievements.toList(),
     'narrative': narrative.toJson(),
     'activeEncounter': activeEncounter?.toJson(),
+    'dateProgressByCharacter': dateProgressByCharacter.map(
+      (characterId, values) => MapEntry(characterId, values),
+    ),
+    'rewardedHighestStageByCharacter': rewardedHighestStageByCharacter,
+    'characterUnlockRewardClaimed': characterUnlockRewardClaimed.toList(),
+    'trueLoveRewardClaimed': trueLoveRewardClaimed.toList(),
   });
   factory IdleState.fresh() => IdleState(
     lastSavedAt: DateTime.now().millisecondsSinceEpoch,
@@ -535,9 +590,9 @@ class IdleState {
     },
     characters: {
       PlayableCharacterIds.roxanne: const CharacterProgress(unlocked: true),
-      PlayableCharacterIds.kai: const CharacterProgress(unlocked: true),
-      PlayableCharacterIds.sofia: const CharacterProgress(unlocked: true),
-      PlayableCharacterIds.astra: const CharacterProgress(unlocked: true),
+      PlayableCharacterIds.kai: const CharacterProgress(),
+      PlayableCharacterIds.sofia: const CharacterProgress(),
+      PlayableCharacterIds.astra: const CharacterProgress(),
       PlayableCharacterIds.legacyRyomi: const CharacterProgress(unlocked: true),
     },
   );
@@ -596,6 +651,18 @@ class IdleState {
     }
     if (version < 7) {
       json = _migrateV6ToV7(json, draft);
+      version = 7;
+    }
+    if (version < 8) {
+      json = _migrateV7ToV8(json, draft);
+      version = 8;
+    }
+    if (version < 9) {
+      json = _migrateV8ToV9(json, draft);
+      version = 9;
+    }
+    if (version < 10) {
+      json = _migrateV9ToV10(json, draft);
     }
     json['version'] = IdleSaveSchema.currentVersion;
     final state = _fromCurrentJson(json, currentMs, draft)._withDefaults(draft);
@@ -633,6 +700,18 @@ class IdleState {
       achievements: _readStringSet(json, 'achievements'),
       narrative: _safeNarrative(json['narrative']),
       activeEncounter: _safeEncounter(json['activeEncounter']),
+      dateProgressByCharacter: _readDateProgress(
+        json['dateProgressByCharacter'],
+      ),
+      rewardedHighestStageByCharacter: _readStringIntMap(
+        json,
+        'rewardedHighestStageByCharacter',
+      ),
+      characterUnlockRewardClaimed: _readStringSet(
+        json,
+        'characterUnlockRewardClaimed',
+      ),
+      trueLoveRewardClaimed: _readStringSet(json, 'trueLoveRewardClaimed'),
     );
   }
 
@@ -760,6 +839,76 @@ class IdleState {
     return migrated;
   }
 
+  static Map<String, dynamic> _migrateV7ToV8(
+    Map<String, dynamic> old,
+    _MigrationDraft draft,
+  ) {
+    draft.markMigrated();
+    final migrated = Map<String, dynamic>.from(old);
+    migrated.putIfAbsent('dateProgressByCharacter', () => <String, dynamic>{});
+    // An old encounter had a different economy (including block cost and
+    // affection). It cannot safely become a new date, so it is cleared rather
+    // than charging/completing it under the new rules.
+    migrated['activeEncounter'] = null;
+    migrated['version'] = 8;
+    return migrated;
+  }
+
+  static Map<String, dynamic> _migrateV8ToV9(
+    Map<String, dynamic> old,
+    _MigrationDraft draft,
+  ) {
+    draft.markMigrated();
+    final migrated = Map<String, dynamic>.from(old);
+    final legacyCharacters =
+        _asMap(migrated['characters']) ?? const <String, dynamic>{};
+    final characters = Map<String, dynamic>.from(legacyCharacters);
+    for (final id in <String>[
+      PlayableCharacterIds.kai,
+      PlayableCharacterIds.sofia,
+      PlayableCharacterIds.astra,
+    ]) {
+      final progress = Map<String, dynamic>.from(_asMap(characters[id]) ?? {});
+      progress['unlocked'] = false;
+      characters[id] = progress;
+    }
+    migrated['characters'] = characters;
+    migrated.putIfAbsent(
+      'rewardedHighestStageByCharacter',
+      () => <String, int>{},
+    );
+    migrated.putIfAbsent('characterUnlockRewardClaimed', () => <String>[]);
+    migrated.putIfAbsent('trueLoveRewardClaimed', () => <String>[]);
+    migrated['version'] = 9;
+    return migrated;
+  }
+
+  static Map<String, dynamic> _migrateV9ToV10(
+    Map<String, dynamic> old,
+    _MigrationDraft draft,
+  ) {
+    draft.markMigrated();
+    final migrated = Map<String, dynamic>.from(old);
+    Map<String, dynamic> migrateActivities(String key) {
+      final source = _asMap(migrated[key]) ?? const <String, dynamic>{};
+      return {
+        for (final entry in source.entries)
+          entry.key: {
+            ...(_asMap(entry.value) ?? const <String, dynamic>{}),
+            // Temporary boosts never become paid permanent upgrades. They are
+            // retained only as legacy data so an old save can be read safely;
+            // normal UI no longer exposes purchase or renewal of this state.
+            'upgraded': false,
+          },
+      };
+    }
+
+    migrated['jobs'] = migrateActivities('jobs');
+    migrated['hobbies'] = migrateActivities('hobbies');
+    migrated['version'] = 10;
+    return migrated;
+  }
+
   IdleState _withDefaults([_MigrationDraft? draft]) {
     final roxanne =
         characters[PlayableCharacterIds.roxanne] ??
@@ -767,23 +916,20 @@ class IdleState {
         characters[PlayableCharacterIds.legacyLia] ??
         const CharacterProgress(unlocked: true);
     final kai =
-        characters[PlayableCharacterIds.kai] ??
-        const CharacterProgress(unlocked: true);
+        characters[PlayableCharacterIds.kai] ?? const CharacterProgress();
     final sofia =
-        characters[PlayableCharacterIds.sofia] ??
-        const CharacterProgress(unlocked: true);
+        characters[PlayableCharacterIds.sofia] ?? const CharacterProgress();
     final astra =
-        characters[PlayableCharacterIds.astra] ??
-        const CharacterProgress(unlocked: true);
+        characters[PlayableCharacterIds.astra] ?? const CharacterProgress();
 
     var normalized = copyWith(
       jobs: _normalizeJobProgress(jobs, draft),
       hobbies: _normalizeHobbyProgress(hobbies, draft),
       characters: {
         PlayableCharacterIds.roxanne: roxanne.copyWith(unlocked: true),
-        PlayableCharacterIds.kai: kai.copyWith(unlocked: true),
-        PlayableCharacterIds.sofia: sofia.copyWith(unlocked: true),
-        PlayableCharacterIds.astra: astra.copyWith(unlocked: true),
+        PlayableCharacterIds.kai: kai,
+        PlayableCharacterIds.sofia: sofia,
+        PlayableCharacterIds.astra: astra,
         PlayableCharacterIds.legacyRyomi: roxanne.copyWith(unlocked: true),
       },
     );
@@ -1381,6 +1527,21 @@ Map<String, int> _readStringIntMap(Map<String, dynamic>? json, String key) {
       entry.key: entry.value is num
           ? (entry.value as num).toInt().clamp(0, 2147483647)
           : int.tryParse('${entry.value}')?.clamp(0, 2147483647) ?? 0,
+  };
+}
+
+Map<String, Map<String, int>> _readDateProgress(Object? value) {
+  final outer = _asMap(value);
+  if (outer == null) return const {};
+  return {
+    for (final character in outer.entries)
+      character.key: {
+        for (final date
+            in (_asMap(character.value) ?? const <String, dynamic>{}).entries)
+          date.key: _readInt(<String, dynamic>{
+            'value': date.value,
+          }, 'value').clamp(0, 2147483647),
+      },
   };
 }
 

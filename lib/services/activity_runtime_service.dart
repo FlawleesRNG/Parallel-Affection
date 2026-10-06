@@ -146,8 +146,10 @@ abstract final class ActivityRuntimeService {
       final individualSpeed = segmentHasBoost
           ? IdleBalance.hobbyBoostSpeedMultiplier
           : 1.0;
-      final equivalentMs = (segmentRealMs * globalSpeed * individualSpeed)
-          .floor();
+      final upgradeMultiplier = progress.upgraded ? 2.0 : 1.0;
+      final equivalentMs =
+          (segmentRealMs * globalSpeed * individualSpeed * upgradeMultiplier)
+              .floor();
       final segment = _applyEquivalentHobbyTime(
         hobby: hobby,
         level: level,
@@ -269,7 +271,8 @@ abstract final class ActivityRuntimeService {
       level = segment.level;
       xp = segment.experience;
       accumulated = segment.accumulated;
-      moneyEarned += segment.moneyEarned;
+      // A permanent Job upgrade changes income, never its XP progression.
+      moneyEarned += segment.moneyEarned * (progress.upgraded ? 2 : 1);
       xpEarned += segment.xpEarned;
       cycles += segment.cyclesCompleted;
       continuousPayments += segment.continuousPaymentsCompleted;
@@ -593,7 +596,9 @@ abstract final class ActivityRuntimeService {
     required JobDefinition job,
     required ActivityProgress progress,
     required IdleState state,
-  }) => jobIncomeForLevel(job: job, level: progress.level, state: state);
+  }) =>
+      jobIncomeForLevel(job: job, level: progress.level, state: state) *
+      (progress.upgraded ? 2 : 1);
 
   static int jobIncomeForLevel({
     required JobDefinition job,

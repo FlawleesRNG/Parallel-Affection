@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../../app/game_controller.dart';
 import '../../core/character_catalog.dart';
-import '../../core/idle_rules.dart';
 import '../../data/idle_balance.dart';
 import '../../features/characters/date_selection_dialog.dart';
 import '../../features/characters/gift_selection_dialog.dart';
@@ -299,6 +298,7 @@ class _ActionsGridV3 extends StatelessWidget {
                     ? () => showDateSelectionDialog(
                         context,
                         controller,
+                        characterId: characterId,
                         onStarted: (result) {
                           windowsController.enqueueUnlockDialogue(
                             'date_started',
@@ -510,61 +510,16 @@ _ActionAvailabilityV3 _encounterActionState(
   IdleState state,
   String characterId,
 ) {
-  if (characterId != PlayableCharacterIds.roxanne) {
-    return const _ActionAvailabilityV3(
-      status: 'Nenhum disponível',
-      lockedReason: 'Nenhum disponível',
-      tooltip: 'Nenhum encontro está disponível neste momento.',
-    );
-  }
-  final progress = state.characters[characterId]!;
   if (state.activeEncounter != null) {
     return const _ActionAvailabilityV3(
       status: 'Em andamento',
       lockedReason: 'Em andamento',
     );
   }
-
-  final encounters = [...IdleBalance.encounters]
-    ..sort((a, b) => a.stage.compareTo(b.stage));
-  final availableByStage = encounters
-      .where((encounter) => progress.stage >= encounter.stage)
-      .toList();
-  if (encounters.isEmpty) {
-    return const _ActionAvailabilityV3(
-      status: 'Nenhum disponível',
-      lockedReason: 'Nenhum disponível',
-      tooltip: 'Nenhum encontro está disponível neste momento.',
-    );
-  }
-  if (availableByStage.isEmpty) {
-    final next = encounters.first;
-    return _ActionAvailabilityV3(
-      status: 'Bloqueado',
-      lockedReason: 'Requer ${IdleRules.stageName(next.stage)}',
-    );
-  }
-
-  final playable = availableByStage.firstWhere(
-    (encounter) =>
-        state.money >= encounter.price &&
-        state.availableBlocks >= encounter.blocks,
-    orElse: () => availableByStage.first,
+  return const _ActionAvailabilityV3(
+    status: 'Locais',
+    tooltip: 'Escolha um local. Encontros usam dinheiro, não Tempo.',
   );
-  if (state.money < playable.price) {
-    return _ActionAvailabilityV3(
-      status: '${playable.blocks} Tempo',
-      lockedReason: 'Falta dinheiro',
-    );
-  }
-  if (state.availableBlocks < playable.blocks) {
-    return _ActionAvailabilityV3(
-      status: '${playable.price} dinheiro',
-      lockedReason: 'Sem Tempo livre',
-    );
-  }
-
-  return const _ActionAvailabilityV3(status: 'Escolher encontro');
 }
 
 String _formatActionCountdown(Duration duration) {

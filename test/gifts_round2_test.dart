@@ -30,6 +30,7 @@ void main() {
     final controller = GameController(_MemoryStorage());
     await controller.initialize();
     await controller.debugMoney(1000);
+    await controller.debugSetCharacterUnlocked('sofia', true);
 
     await controller.gift('sofia', 'coffee', 10);
 

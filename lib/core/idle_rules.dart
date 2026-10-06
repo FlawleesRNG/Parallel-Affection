@@ -38,7 +38,8 @@ abstract final class IdleRules {
       requirementsMet(state, IdleBalance.hobby(id).requires);
 
   static bool characterUnlocked(IdleState state, String id) =>
-      PlayableCharacterCatalog.maybeById(id)?.availableFromStart ?? false;
+      state.characters[PlayableCharacterCatalog.canonicalId(id)]?.unlocked ??
+      false;
 
   static String stageName(int stage) =>
       RelationshipStageCatalog.titleFor(stage);
@@ -128,8 +129,15 @@ abstract final class IdleRules {
       return false;
     }
     return stage.requirements.every(
-      (requirement) => requirementMet(state, canonicalId, requirement),
-    );
+          (requirement) => requirementMet(state, canonicalId, requirement),
+        ) &&
+        CharacterDateRequirements.forStage(canonicalId, character.stage).every(
+          (requirement) =>
+              (state.dateProgressByCharacter[canonicalId]?[requirement
+                      .locationId] ??
+                  0) >=
+              requirement.requiredCount,
+        );
   }
 
   static int requirementCurrentValue(

@@ -1,4 +1,5 @@
 import '../core/character_catalog.dart';
+import 'date_locations.dart';
 
 enum CharacterRouteRequirementType {
   hobbyLevel,
@@ -638,4 +639,68 @@ abstract final class CharacterRouteCatalog {
 
   static CharacterRouteDefinition byCharacterId(String characterId) =>
       maybeFor(characterId) ?? roxanne;
+}
+
+/// Mechanical date goals are kept separate from lore requirements so adding a
+/// location never rewrites approved hobby, job, gift or affection data.
+abstract final class CharacterDateRequirements {
+  static const _none = <DateRequirement>[];
+
+  static const byCharacterAndStage = <String, List<List<DateRequirement>>>{
+    PlayableCharacterIds.roxanne: [
+      _none,
+      _none,
+      [DateRequirement('cafe', 1)],
+      [DateRequirement('cafe', 3)],
+      [DateRequirement('cinema', 1)],
+      [DateRequirement('park', 3)],
+      [DateRequirement('night_viewpoint', 1)],
+      [DateRequirement('night_viewpoint', 3)],
+      [DateRequirement('restaurant', 2)],
+      [DateRequirement('night_viewpoint', 5)],
+    ],
+    PlayableCharacterIds.kai: [
+      _none,
+      _none,
+      [DateRequirement('park', 1)],
+      [DateRequirement('park', 3)],
+      [DateRequirement('arcade', 2)],
+      [DateRequirement('cafe', 3)],
+      [DateRequirement('amusement_park', 2)],
+      [DateRequirement('amusement_park', 4)],
+      [DateRequirement('restaurant', 2)],
+      [DateRequirement('night_viewpoint', 4)],
+    ],
+    PlayableCharacterIds.sofia: [
+      _none,
+      _none,
+      [DateRequirement('cafe', 1)],
+      [DateRequirement('restaurant', 1)],
+      [DateRequirement('restaurant', 3)],
+      [DateRequirement('cinema', 2)],
+      [DateRequirement('night_viewpoint', 2)],
+      [DateRequirement('restaurant', 5)],
+      [DateRequirement('night_viewpoint', 4)],
+      [DateRequirement('restaurant', 8)],
+    ],
+    PlayableCharacterIds.astra: [
+      _none,
+      _none,
+      [DateRequirement('cafe', 1)],
+      [DateRequirement('arcade', 1)],
+      [DateRequirement('cinema', 2)],
+      [DateRequirement('park', 3)],
+      [DateRequirement('night_viewpoint', 2)],
+      [DateRequirement('night_viewpoint', 4)],
+      [DateRequirement('restaurant', 3)],
+      [DateRequirement('night_viewpoint', 6)],
+    ],
+  };
+
+  static List<DateRequirement> forStage(String characterId, int stage) {
+    final canonicalId = PlayableCharacterCatalog.canonicalId(characterId);
+    final values = byCharacterAndStage[canonicalId];
+    if (values == null || stage < 0 || stage >= values.length) return _none;
+    return values[stage];
+  }
 }

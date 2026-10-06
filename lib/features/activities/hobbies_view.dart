@@ -11,6 +11,7 @@ import '../../models/idle_models.dart';
 import '../../services/activity_runtime_service.dart';
 import '../../services/game_audio_hooks.dart';
 import '../../services/time_reservation_service.dart';
+import 'activity_upgrade_button.dart';
 
 enum _HobbiesFilter { all, active, available, locked, mastered }
 
@@ -159,7 +160,8 @@ class _HobbiesViewState extends State<HobbiesView> {
                                       ),
                                     ),
                                     onBoostConfirm: () async {
-                                      await controller.purchaseHobbyBoost(
+                                      await controller.purchaseActivityUpgrade(
+                                        ActivityKind.hobby,
                                         hobby.id,
                                       );
                                       if (mounted) {
@@ -603,145 +605,146 @@ class _HobbyCard extends StatelessWidget {
     final cycleDuration = hobby.trainingDurationAtLevel(progress.level);
     final xpNeeded = IdleBalance.hobbyXpNeeded(hobby, progress.level);
     final skill = PlayerSkillService.skillForHobby(hobby.id);
-    final boostRemaining = ActivityRuntimeService.remainingHobbyBoostTime(
-      hobby: hobby,
-      progress: progress,
-      state: state,
-      now: now,
-    );
 
     return Semantics(
       label:
           '${hobby.displayName}, $status, nível ${progress.level}, desenvolve ${skill.displayName}',
-      child: Container(
-        padding: const EdgeInsets.all(13),
-        decoration: BoxDecoration(
-          color: _elevated,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(
-            color: active ? _hobbyBlue : _outline,
-            width: active ? 1.9 : 1.5,
+      child: GestureDetector(
+        onTap: unlocked && !mastered ? onToggle : null,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: const EdgeInsets.all(13),
+          decoration: BoxDecoration(
+            color: _elevated,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: active ? _hobbyBlue : _outline,
+              width: active ? 1.9 : 1.5,
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x405B4351),
+                blurRadius: 0,
+                offset: Offset(0, 5),
+              ),
+            ],
           ),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x405B4351),
-              blurRadius: 0,
-              offset: Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _HobbyIcon(id: hobby.id, active: active, mastered: mastered),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _HobbyTitle(
-                    hobby: hobby,
-                    skill: skill,
-                    progress: progress,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _HobbyIcon(id: hobby.id, active: active, mastered: mastered),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _HobbyTitle(
+                      hobby: hobby,
+                      skill: skill,
+                      progress: progress,
+                    ),
                   ),
-                ),
-                _StatusBadge(label: status, color: _statusColor(status)),
-              ],
-            ),
-            const SizedBox(height: 9),
-            Text(
-              hobby.description,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: _secondaryText,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                height: 1.22,
-              ),
-            ),
-            const SizedBox(height: 10),
-            _SkillPanel(skill: skill, level: progress.level),
-            if (recentlyUnlocked) ...[
-              const SizedBox(height: 9),
-              _LocalBanner(
-                icon: Icons.auto_awesome_rounded,
-                title: 'NOVO HOBBY DISPONÍVEL',
-                message: hobby.displayName,
-                color: _hobbyBlue,
-              ),
-            ],
-            if (feedback != null) ...[
-              const SizedBox(height: 9),
-              _HobbyFeedbackPanel(
-                feedback: feedback!,
-                hobby: hobby,
-                color: feedback!.reachedMaximumLevel
-                    ? GameColors.purple
-                    : _hobbyBlue,
-              ),
-            ],
-            if (timeWarning != null) ...[
-              const SizedBox(height: 9),
-              _TimeWarningPanel(message: timeWarning!),
-            ],
-            const SizedBox(height: 10),
-            if (!unlocked)
-              _HobbyRequirementSection(hobby: hobby, state: state)
-            else ...[
-              _HobbyTrainingSection(
-                hobby: hobby,
-                progress: progress,
-                state: state,
-                now: now,
-                trainingProgress: trainingProgress,
-                status: status,
-              ),
-              const SizedBox(height: 9),
-              _HobbyXpSection(
-                progress: progress,
-                xpNeeded: xpNeeded,
-                mastered: mastered,
-              ),
-              const SizedBox(height: 10),
-              _StatsGrid(
-                items: [
-                  (
-                    'Treino',
-                    mastered ? 'Dominado' : '${cycleDuration.inSeconds}s',
-                  ),
-                  ('XP', mastered ? 'Máximo' : '+${hobby.xpPerTrainingCycle}'),
-                  ('Tempo', '$timeCost'),
-                  ('Ciclos', '${progress.cycles}'),
+                  _StatusBadge(label: status, color: _statusColor(status)),
+                  if (unlocked)
+                    ActivityUpgradeButton(
+                      activityName: hobby.displayName,
+                      activityKindLabel: 'Hobby',
+                      upgraded: progress.upgraded,
+                      canAfford:
+                          state.diamonds >=
+                          IdleBalance.activityUpgradeCherryCost,
+                      onConfirm: () async => onBoostConfirm(),
+                    ),
                 ],
               ),
+              const SizedBox(height: 9),
+              Text(
+                hobby.description,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: _secondaryText,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  height: 1.22,
+                ),
+              ),
               const SizedBox(height: 10),
-              _NextLevelSection(hobby: hobby, progress: progress),
+              _SkillPanel(skill: skill, level: progress.level),
+              if (recentlyUnlocked) ...[
+                const SizedBox(height: 9),
+                _LocalBanner(
+                  icon: Icons.auto_awesome_rounded,
+                  title: 'NOVO HOBBY DISPONÍVEL',
+                  message: hobby.displayName,
+                  color: _hobbyBlue,
+                ),
+              ],
+              if (feedback != null) ...[
+                const SizedBox(height: 9),
+                _HobbyFeedbackPanel(
+                  feedback: feedback!,
+                  hobby: hobby,
+                  color: feedback!.reachedMaximumLevel
+                      ? GameColors.purple
+                      : _hobbyBlue,
+                ),
+              ],
+              if (timeWarning != null) ...[
+                const SizedBox(height: 9),
+                _TimeWarningPanel(message: timeWarning!),
+              ],
               const SizedBox(height: 10),
-              _HobbyBoostPanel(
-                hobby: hobby,
-                progress: progress,
-                state: state,
-                remaining: boostRemaining,
-                confirming: confirmingBoost,
-                warning: boostWarning,
-                rootCherriesInfinite: rootCherriesInfinite,
-                onPrompt: onBoostPrompt,
-                onCancel: onBoostCancel,
-                onConfirm: onBoostConfirm,
+              if (!unlocked)
+                _HobbyRequirementSection(hobby: hobby, state: state)
+              else ...[
+                _HobbyTrainingSection(
+                  hobby: hobby,
+                  progress: progress,
+                  state: state,
+                  now: now,
+                  trainingProgress: trainingProgress,
+                  status: status,
+                ),
+                const SizedBox(height: 9),
+                _HobbyXpSection(
+                  progress: progress,
+                  xpNeeded: xpNeeded,
+                  mastered: mastered,
+                ),
+                const SizedBox(height: 10),
+                _StatsGrid(
+                  items: [
+                    (
+                      'Treino',
+                      mastered ? 'Dominado' : '${cycleDuration.inSeconds}s',
+                    ),
+                    (
+                      'XP',
+                      mastered ? 'Máximo' : '+${hobby.xpPerTrainingCycle}',
+                    ),
+                    ('Tempo', '$timeCost'),
+                    ('Ciclos', '${progress.cycles}'),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                _NextLevelSection(hobby: hobby, progress: progress),
+              ],
+              const SizedBox(height: 4),
+              Text(
+                unlocked
+                    ? (active
+                          ? 'Toque no card para pausar'
+                          : 'Toque no card para iniciar')
+                    : 'Atividade bloqueada',
+                style: const TextStyle(
+                  color: _secondaryText,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11,
+                ),
               ),
             ],
-            const SizedBox(height: 11),
-            _HobbyActionSection(
-              unlocked: unlocked,
-              active: active,
-              paused: paused,
-              mastered: mastered,
-              timeCost: timeCost,
-              hasTime: hasTime,
-              onToggle: onToggle,
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -1336,6 +1339,7 @@ class _InfoStrip extends StatelessWidget {
   );
 }
 
+// ignore: unused_element
 class _HobbyBoostPanel extends StatelessWidget {
   const _HobbyBoostPanel({
     required this.hobby,
@@ -1534,6 +1538,7 @@ class _HobbyBoostPanel extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _HobbyActionSection extends StatelessWidget {
   const _HobbyActionSection({
     required this.unlocked,

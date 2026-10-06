@@ -68,7 +68,7 @@ void main() {
         expect(find.text('Tempo livre'), findsOneWidget);
         expect(find.text('Dominados'), findsWidgets);
         expect(find.text('Nível total'), findsOneWidget);
-        expect(find.textContaining('TREINAR — 2 TEMPO'), findsWidgets);
+        expect(find.textContaining('Toque no card para iniciar'), findsWidgets);
         expect(tester.takeException(), isNull);
       },
     );

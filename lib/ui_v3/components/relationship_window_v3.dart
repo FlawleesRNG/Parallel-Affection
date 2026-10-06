@@ -7,6 +7,7 @@ import '../../core/idle_rules.dart';
 import '../../core/relationship_stages.dart';
 import '../../data/idle_balance.dart';
 import '../../data/character_routes.dart';
+import '../../data/date_locations.dart';
 import '../../models/idle_models.dart';
 import '../controllers/ryomi_windows_controller_v3.dart';
 import '../design/connections_colors_v3.dart';
@@ -602,6 +603,23 @@ List<_RelationshipRequirementV3> _relationshipRequirements(
           requirement,
         ),
         target: target,
+      ),
+    );
+  }
+
+  for (final requirement in CharacterDateRequirements.forStage(
+    characterId,
+    stage,
+  )) {
+    final location = DateLocationCatalog.byId(requirement.locationId);
+    requirements.add(
+      _RelationshipRequirementV3(
+        label: 'Encontro: ${location.name}',
+        current:
+            state.dateProgressByCharacter[characterId]?[requirement
+                .locationId] ??
+            0,
+        target: requirement.requiredCount,
       ),
     );
   }

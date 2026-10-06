@@ -211,6 +211,7 @@ abstract final class IdleBalance {
   static int xpNeeded(int level) => 20 + level * 15;
   static int affectionNeeded(int stage) => 100 + stage * 50;
   static const maximumJobLevel = 10;
+  static const activityUpgradeCherryCost = 5;
   static const maximumLevelContinuousIncomeInterval = Duration(seconds: 1);
   static const jobBoostCherryCost = 5;
   static const jobBoostActiveDuration = Duration(minutes: 10);

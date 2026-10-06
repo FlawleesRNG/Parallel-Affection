@@ -383,33 +383,21 @@ void main() {
     await tester.pumpWidget(_hobbiesApp(controller));
     await tester.pump();
 
-    await tester.tap(find.byKey(const ValueKey('hobby_boost_leitura')));
+    await tester.tap(find.byIcon(Icons.local_florist_rounded).first);
     await tester.pump();
-    expect(find.textContaining('Acelerar este Hobby'), findsOneWidget);
+    expect(find.text('APRIMORAR LEITURA?'), findsOneWidget);
 
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('hobby_boost_cancel_leitura')),
-    );
-    await tester.tap(find.byKey(const ValueKey('hobby_boost_cancel_leitura')));
+    await tester.tap(find.text('CANCELAR'));
     await tester.pump();
     expect(controller.state.diamonds, 5);
-    expect(controller.state.hobbies['leitura']!.remainingBoostActiveTimeMs, 0);
+    expect(controller.state.hobbies['leitura']!.upgraded, isFalse);
 
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('hobby_boost_leitura')),
-    );
-    await tester.tap(find.byKey(const ValueKey('hobby_boost_leitura')));
+    await tester.tap(find.byIcon(Icons.local_florist_rounded).first);
     await tester.pump();
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('hobby_boost_confirm_leitura')),
-    );
-    await tester.tap(find.byKey(const ValueKey('hobby_boost_confirm_leitura')));
+    await tester.tap(find.text('APRIMORAR'));
     await tester.pump();
     expect(controller.state.diamonds, 0);
-    expect(
-      find.byKey(const ValueKey('hobby_boost_timer_leitura')),
-      findsOneWidget,
-    );
+    expect(controller.state.hobbies['leitura']!.upgraded, isTrue);
     expect(find.text('Impulsos'), findsWidgets);
   });
 }

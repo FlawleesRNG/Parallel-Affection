@@ -29,6 +29,13 @@ class _RyomiScreenV3State extends State<RyomiScreenV3> {
   String _selectedCharacterId =
       PlayableCharacterCatalog.primaryRouteCharacterId;
 
+  String get _activeSelectedCharacterId {
+    final progress = widget.controller.state.characters[_selectedCharacterId];
+    return progress?.unlocked == true
+        ? _selectedCharacterId
+        : PlayableCharacterCatalog.primaryRouteCharacterId;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -65,7 +72,7 @@ class _RyomiScreenV3State extends State<RyomiScreenV3> {
           height: widget.spec.compactSelectorHeight,
           child: CharacterSelectorV3(
             characters: widget.controller.state.characters,
-            selectedCharacterId: _selectedCharacterId,
+            selectedCharacterId: _activeSelectedCharacterId,
             compact: true,
             onSelected: _selectCharacter,
           ),
@@ -77,7 +84,7 @@ class _RyomiScreenV3State extends State<RyomiScreenV3> {
             controller: widget.controller,
             spec: widget.spec,
             windowsController: _windowsController,
-            selectedCharacterId: _selectedCharacterId,
+            selectedCharacterId: _activeSelectedCharacterId,
             layoutEditor: widget.layoutEditor,
           ),
         ),
@@ -94,7 +101,7 @@ class _RyomiScreenV3State extends State<RyomiScreenV3> {
         width: widget.spec.selectorWidth,
         child: CharacterSelectorV3(
           characters: widget.controller.state.characters,
-          selectedCharacterId: _selectedCharacterId,
+          selectedCharacterId: _activeSelectedCharacterId,
           desktopCompact: widget.spec.isCompactDesktop,
           wideDesktop: widget.spec.isWideDesktop,
           onSelected: _selectCharacter,
@@ -107,7 +114,7 @@ class _RyomiScreenV3State extends State<RyomiScreenV3> {
           controller: widget.controller,
           spec: widget.spec,
           windowsController: _windowsController,
-          selectedCharacterId: _selectedCharacterId,
+          selectedCharacterId: _activeSelectedCharacterId,
           layoutEditor: widget.layoutEditor,
         ),
       ),

@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../app/game_controller.dart';
+import '../../core/character_catalog.dart';
 import '../../core/idle_rules.dart';
 import '../../core/number_formatter.dart';
 import '../../core/theme/game_tokens.dart';
@@ -685,6 +686,7 @@ class _InteractionGridV2State extends State<_InteractionGridV2> {
         () => showGiftSelectionDialog(
           context,
           widget.controller,
+          characterId: PlayableCharacterIds.roxanne,
           onDelivered: (result) => widget.onResult(result, _RyomiV2Event.gift),
         ),
         null,
@@ -700,6 +702,7 @@ class _InteractionGridV2State extends State<_InteractionGridV2> {
         () => showDateSelectionDialog(
           context,
           widget.controller,
+          characterId: PlayableCharacterIds.roxanne,
           onStarted: (result) =>
               widget.onResult(result, _RyomiV2Event.encounter),
         ),

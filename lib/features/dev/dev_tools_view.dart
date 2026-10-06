@@ -12,6 +12,7 @@ import '../../core/relationship_stages.dart';
 import '../../core/theme/game_tokens.dart';
 import '../../data/idle_balance.dart';
 import '../../data/character_routes.dart';
+import '../../data/date_locations.dart';
 import '../../models/idle_models.dart';
 import '../../services/activity_runtime_service.dart';
 import '../../services/admin_auth_service.dart';
@@ -580,9 +581,47 @@ class _DevToolsViewState extends State<DevToolsView> {
         _RootTypeLabel(
           'characterId: ${definition.id}\n'
           'routeReady: ${route.routeContentReady}\n'
+          'Desbloqueada: ${progress.unlocked ? 'sim' : 'não'}\n'
+          'Maior milestone recompensado: ${state.rewardedHighestStageByCharacter[_selectedCharacterId] ?? 0}\n'
+          'Recompensa de unlock: ${state.characterUnlockRewardClaimed.contains(_selectedCharacterId) ? 'resgatada' : 'pendente'}\n'
+          'Amor verdadeiro: ${state.trueLoveRewardClaimed.contains(_selectedCharacterId) ? 'resgatado' : 'pendente'}\n'
           'Etapa: ${progress.stage + 1}/10 · ${IdleRules.stageName(progress.stage)}\n'
           'Afeição: ${progress.affection}/${stage.affectionRequired}',
         ),
+        _ButtonWrap([
+          _rootButton(
+            progress.unlocked
+                ? 'Bloquear personagem'
+                : 'Desbloquear personagem',
+            () => _guard(
+              () async => _run(
+                await widget.controller.debugSetCharacterUnlocked(
+                  _selectedCharacterId,
+                  !progress.unlocked,
+                ),
+                label: 'UNLOCK DEV',
+              ),
+            ),
+          ),
+          _rootButton(
+            'Desbloquear todas',
+            () => _guard(
+              () async => _run(
+                await widget.controller.debugUnlockAllCharacters(),
+                label: 'UNLOCK DEV',
+              ),
+            ),
+          ),
+          _rootButton(
+            'Resetar desbloqueios',
+            () => _guard(
+              () async => _run(
+                await widget.controller.debugResetCharacterUnlocks(),
+                label: 'UNLOCK DEV',
+              ),
+            ),
+          ),
+        ]),
         for (final requirement in stage.requirements)
           ListTile(
             dense: true,
@@ -595,6 +634,79 @@ class _DevToolsViewState extends State<DevToolsView> {
                   : '${IdleRules.requirementCurrentValue(state, _selectedCharacterId, requirement)} / ${requirement.requiredValue}',
             ),
           ),
+        const Divider(),
+        const Text('Encontros', style: TextStyle(fontWeight: FontWeight.w900)),
+        for (final location in DateLocationCatalog.locations)
+          ListTile(
+            dense: true,
+            title: Text('${location.name} · ${location.id}'),
+            subtitle: Text('characterId: $_selectedCharacterId'),
+            trailing: Wrap(
+              spacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  '${widget.controller.dateCount(_selectedCharacterId, location.id)}',
+                ),
+                IconButton(
+                  tooltip: '+1 encontro',
+                  onPressed: () => _guard(
+                    () async => _run(
+                      await widget.controller.debugSetDateCount(
+                        _selectedCharacterId,
+                        location.id,
+                        widget.controller.dateCount(
+                              _selectedCharacterId,
+                              location.id,
+                            ) +
+                            1,
+                      ),
+                      label: 'ENCONTRO DEV',
+                    ),
+                  ),
+                  icon: const Icon(Icons.add),
+                ),
+                IconButton(
+                  tooltip: '-1 encontro',
+                  onPressed: () => _guard(
+                    () async => _run(
+                      await widget.controller.debugSetDateCount(
+                        _selectedCharacterId,
+                        location.id,
+                        widget.controller.dateCount(
+                              _selectedCharacterId,
+                              location.id,
+                            ) -
+                            1,
+                      ),
+                      label: 'ENCONTRO DEV',
+                    ),
+                  ),
+                  icon: const Icon(Icons.remove),
+                ),
+              ],
+            ),
+          ),
+        _ButtonWrap([
+          _rootButton(
+            'Concluir encontro ativo',
+            () => _guard(
+              () async => _run(
+                await widget.controller.debugCompleteActiveDate(),
+                label: 'ENCONTRO DEV',
+              ),
+            ),
+          ),
+          _rootButton(
+            'Limpar encontro ativo',
+            () => _guard(
+              () async => _run(
+                await widget.controller.debugClearActiveDate(),
+                label: 'ENCONTRO DEV',
+              ),
+            ),
+          ),
+        ]),
         DropdownButtonFormField<String>(
           initialValue: _selectedGiftId,
           decoration: const InputDecoration(labelText: 'Contador de presente'),
@@ -1268,6 +1380,17 @@ class _DevToolsViewState extends State<DevToolsView> {
             ),
           ),
           _rootButton(
+            progress.upgraded ? 'Remover aprimoramento' : 'Aprimorar x2',
+            () async => _run(
+              await widget.controller.debugSetActivityUpgrade(
+                ActivityKind.hobby,
+                hobby.id,
+                !progress.upgraded,
+              ),
+              label: 'HOBBY APRIMORAMENTO',
+            ),
+          ),
+          _rootButton(
             'Remover boost',
             () async => _run(
               await widget.controller.debugRemoveHobbyBoost(hobby.id),
@@ -1852,6 +1975,17 @@ class _DevToolsViewState extends State<DevToolsView> {
               () async => _run(
                 await widget.controller.purchaseJobBoost(job.id),
                 label: 'EMPREGO IMPULSO',
+              ),
+            ),
+            _rootButton(
+              progress.upgraded ? 'Remover aprimoramento' : 'Aprimorar x2',
+              () async => _run(
+                await widget.controller.debugSetActivityUpgrade(
+                  ActivityKind.job,
+                  job.id,
+                  !progress.upgraded,
+                ),
+                label: 'EMPREGO APRIMORAMENTO',
               ),
             ),
             _rootButton(
