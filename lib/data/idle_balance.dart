@@ -569,11 +569,11 @@ abstract final class IdleBalance {
         JobRequirement(
           JobRequirementType.relationshipStage,
           PlayableCharacterIds.roxanne,
-          4,
+          1,
         ),
       ],
       futureLocationId: 'radio_studio',
-      unlockHint: 'Oratória nível 5, Música nível 4 e Roxanne Amiga',
+      unlockHint: 'Oratória nível 5, Música nível 4 e Roxanne Mal-entendido',
     ),
     JobDefinition(
       id: 'freelance_programmer',

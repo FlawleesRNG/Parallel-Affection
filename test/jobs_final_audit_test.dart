@@ -169,7 +169,7 @@ void main() {
       expect(IdleBalance.job('radio_assistant').requires, {
         'hobby:oratoria': 5,
         'hobby:musica': 4,
-        'stage:roxanne': 4,
+        'stage:roxanne': 1,
       });
       expect(IdleBalance.job('freelance_programmer').requires, {
         'hobby:programacao': 6,

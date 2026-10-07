@@ -152,7 +152,7 @@ abstract final class PlayableCharacterCatalog {
     visibleName: 'Astra',
     selectorOrder: 4,
     availableFromStart: true,
-    routeReady: false,
+    routeReady: true,
     sceneAsset: astraSceneAsset,
     selectorAsset: astraSelectorAsset,
     accent: Color(0xFF9A7AD8),

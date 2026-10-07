@@ -500,11 +500,11 @@ abstract final class CharacterRouteCatalog {
 
   static const astra = CharacterRouteDefinition(
     characterId: PlayableCharacterIds.astra,
-    routeContentReady: false,
+    routeContentReady: true,
     sourceMetadata: {
       'sourceDocument': sourceDocument,
       'sourceSection': 'Relações - Astra',
-      'conflict': 'Estágio 5 cita Vinho, mas não informa quantidade.',
+      'alphaResolution': 'O requisito de vinho sem quantidade usa uma entrega.',
     },
     futureNarrativeMetadata: {
       'theme': 'In-Meow/Guilda, magia, segredo e metamorfose',
@@ -561,11 +561,7 @@ abstract final class CharacterRouteCatalog {
         requirements: [
           CharacterRouteRequirement.hobbyLevel('teatro', 4),
           CharacterRouteRequirement.jobLevel('local_flyering', 4),
-          CharacterRouteRequirement.unresolvedGift(
-            'wine',
-            sourceLabel: 'Vinho',
-            sourceNote: 'Preço documentado, quantidade ausente no DOCX.',
-          ),
+          CharacterRouteRequirement.giftDelivered('wine', 1),
         ],
       ),
       CharacterRouteStageDefinition(

@@ -77,7 +77,7 @@ void main() {
       );
     }
     expect(CharacterRouteCatalog.roxanne.sourceName, 'Roxxy');
-    expect(CharacterRouteCatalog.astra.routeContentReady, isFalse);
+    expect(CharacterRouteCatalog.astra.routeContentReady, isTrue);
   });
 
   test('requisitos são AND e consultam hobby, emprego e presente reais', () {

@@ -78,7 +78,7 @@ void main() {
     expect(PlayableCharacterCatalog.kai.visibleName, 'Kai');
     expect(PlayableCharacterCatalog.kai.routeReady, isTrue);
     expect(PlayableCharacterCatalog.sofia.routeReady, isTrue);
-    expect(PlayableCharacterCatalog.astra.routeReady, isFalse);
+    expect(PlayableCharacterCatalog.astra.routeReady, isTrue);
     expect(
       PlayableCharacterCatalog.canonicalId(PlayableCharacterIds.legacyRyomi),
       PlayableCharacterIds.roxanne,
