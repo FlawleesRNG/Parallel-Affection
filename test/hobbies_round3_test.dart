@@ -398,6 +398,6 @@ void main() {
     await tester.pump();
     expect(controller.state.diamonds, 0);
     expect(controller.state.hobbies['leitura']!.upgraded, isTrue);
-    expect(find.text('Impulsos'), findsWidgets);
+    expect(find.text('Impulsos'), findsNothing);
   });
 }

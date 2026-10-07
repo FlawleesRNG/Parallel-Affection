@@ -1732,7 +1732,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('dock_empregos')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('jobs_grid')), findsOneWidget);
-    expect(find.textContaining('/s'), findsWidgets);
+    expect(find.text('Nv. 1'), findsWidgets);
 
     await tester.tap(find.byKey(const ValueKey('dock_hobbies')));
     await tester.pumpAndSettle();
@@ -1755,14 +1755,13 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('dock_empregos')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('jobs_overview_panel')), findsOneWidget);
+    expect(find.byKey(const ValueKey('jobs_grid')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('job_card_neighborhood_deliveries')),
       findsOneWidget,
     );
-    expect(find.text('Empregos'), findsWidgets);
     expect(find.text('ENTREGAS DE BAIRRO'), findsOneWidget);
-    expect(find.textContaining('/s'), findsWidgets);
+    expect(find.text('Nv. 1'), findsWidgets);
 
     await tester.ensureVisible(
       find.byKey(const ValueKey('job_card_neighborhood_deliveries')),
@@ -1774,9 +1773,8 @@ void main() {
 
     expect(controller.state.jobs['neighborhood_deliveries']!.active, isTrue);
     expect(controller.state.availableBlocks, 4);
-    expect(find.text('EM ANDAMENTO'), findsOneWidget);
-    expect(find.text('Tempo livre'), findsOneWidget);
-    expect(find.text('4 / 6'), findsWidgets);
+    expect(find.text('EM ANDAMENTO'), findsNothing);
+    expect(find.text('Tempo livre'), findsNothing);
     expect(
       find.byKey(const ValueKey('gameplay_feedback_overlay_v3')),
       findsNothing,
@@ -1827,7 +1825,7 @@ void main() {
 
     expect(controller.state.diamonds, before - IdleBalance.jobBoostCherryCost);
     expect(controller.state.jobs['neighborhood_deliveries']!.upgraded, isTrue);
-    expect(find.text('Impulsos'), findsOneWidget);
+    expect(find.text('Impulsos'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

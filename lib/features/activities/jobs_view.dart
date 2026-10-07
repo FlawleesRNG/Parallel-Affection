@@ -1,3 +1,5 @@
+// ignore_for_file: unused_element, unused_field, unused_local_variable, dead_code
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -28,7 +30,7 @@ class JobsView extends StatefulWidget {
 class _JobsViewState extends State<JobsView> {
   Timer? _refreshTimer;
   DateTime _now = DateTime.now();
-  _JobsFilter _filter = _JobsFilter.all;
+  final _JobsFilter _filter = _JobsFilter.all;
   final Set<String> _confirmingBoostJobIds = {};
 
   GameController get controller => widget.controller;
@@ -51,119 +53,83 @@ class _JobsViewState extends State<JobsView> {
   Widget build(BuildContext context) {
     final state = controller.state;
     final time = TimeReservationService.snapshot(state);
-    final visibleJobs = IdleBalance.jobs.where((job) {
-      final progress = state.jobs[job.id] ?? const ActivityProgress();
-      final unlocked = IdleRules.jobUnlocked(state, job.id);
-      return switch (_filter) {
-        _JobsFilter.all => true,
-        _JobsFilter.active => progress.active,
-        _JobsFilter.available => unlocked && !progress.active,
-        _JobsFilter.locked => !unlocked,
-        _JobsFilter.maximumLevel => progress.level >= job.maximumLevel,
-      };
-    }).toList();
-
     return DecoratedBox(
       decoration: const BoxDecoration(color: Color(0xFFF7EEDC)),
       child: Padding(
         padding: const EdgeInsets.all(GameSpacing.md),
         child: Column(
           children: [
-            const _JobsHeader(),
-            const SizedBox(height: 12),
-            _JobsSummary(
-              state: state,
-              time: time,
-              incomePerSecond: _currentIncomePerSecond(state),
-            ),
+            const _JobsHeaderCompact(),
             const SizedBox(height: 10),
-            _JobsFilters(
-              selected: _filter,
-              onSelected: (value) => setState(() => _filter = value),
-            ),
-            const SizedBox(height: 12),
             Expanded(
-              child: visibleJobs.isEmpty
-                  ? _EmptyJobsFilterMessage(filter: _filter)
-                  : LayoutBuilder(
-                      builder: (context, constraints) {
-                        final twoColumns = constraints.maxWidth >= 980;
-                        final spacing = twoColumns ? 14.0 : 0.0;
-                        final cardWidth = twoColumns
-                            ? (constraints.maxWidth - spacing) / 2
-                            : constraints.maxWidth;
-                        return SingleChildScrollView(
-                          key: const ValueKey('jobs_grid'),
-                          child: Wrap(
-                            spacing: spacing,
-                            runSpacing: 14,
-                            children: [
-                              for (final job in visibleJobs)
-                                SizedBox(
-                                  width: cardWidth,
-                                  child: _JobCard(
-                                    key: ValueKey('job_card_${job.id}'),
-                                    job: job,
-                                    progress:
-                                        state.jobs[job.id] ??
-                                        const ActivityProgress(),
-                                    state: state,
-                                    time: time,
-                                    now: _now,
-                                    unlocked: IdleRules.jobUnlocked(
-                                      state,
-                                      job.id,
-                                    ),
-                                    recentlyUnlocked: controller
-                                        .recentlyUnlockedJobIds
-                                        .contains(job.id),
-                                    feedback: controller.jobFeedbacks[job.id],
-                                    timeWarning:
-                                        controller.jobTimeWarnings[job.id],
-                                    boostWarning:
-                                        controller.jobBoostWarnings[job.id],
-                                    confirmingBoost: _confirmingBoostJobIds
-                                        .contains(job.id),
-                                    onToggle: () async {
-                                      await controller.toggle(
-                                        ActivityKind.job,
-                                        job.id,
-                                      );
-                                      GameAudioHooks.emit(GameAudioCue.menu);
-                                    },
-                                    onBoostPrompt: () => setState(
-                                      () => _confirmingBoostJobIds.add(job.id),
-                                    ),
-                                    onBoostCancel: () => setState(
-                                      () =>
-                                          _confirmingBoostJobIds.remove(job.id),
-                                    ),
-                                    onBoostConfirm: () async {
-                                      await controller.purchaseActivityUpgrade(
-                                        ActivityKind.job,
-                                        job.id,
-                                      );
-                                      if (mounted) {
-                                        setState(
-                                          () => _confirmingBoostJobIds.remove(
-                                            job.id,
-                                          ),
-                                        );
-                                      }
-                                    },
-                                  ),
-                                ),
-                            ],
-                          ),
-                        );
-                      },
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final columns = constraints.maxWidth >= 900 ? 3 : 2;
+                  return GridView.builder(
+                    key: const ValueKey('jobs_grid'),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: columns,
+                      mainAxisExtent: 116,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
                     ),
+                    itemCount: IdleBalance.jobs.length,
+                    itemBuilder: (context, index) {
+                      final job = IdleBalance.jobs[index];
+                      return _JobCard(
+                        key: ValueKey('job_card_${job.id}'),
+                        job: job,
+                        progress:
+                            state.jobs[job.id] ?? const ActivityProgress(),
+                        state: state,
+                        time: time,
+                        now: _now,
+                        unlocked: IdleRules.jobUnlocked(state, job.id),
+                        recentlyUnlocked: false,
+                        feedback: null,
+                        timeWarning: controller.jobTimeWarnings[job.id],
+                        boostWarning: null,
+                        rootCherriesInfinite: controller.rootCherriesInfinite,
+                        confirmingBoost: false,
+                        onToggle: () async {
+                          await controller.toggle(ActivityKind.job, job.id);
+                          GameAudioHooks.emit(GameAudioCue.menu);
+                        },
+                        onBoostPrompt: () {},
+                        onBoostCancel: () {},
+                        onBoostConfirm: () async {
+                          await controller.purchaseActivityUpgrade(
+                            ActivityKind.job,
+                            job.id,
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+class _JobsHeaderCompact extends StatelessWidget {
+  const _JobsHeaderCompact();
+
+  @override
+  Widget build(BuildContext context) => const Row(
+    children: [
+      Icon(Icons.work_rounded, color: Color(0xFF70A77C)),
+      SizedBox(width: 8),
+      Text(
+        'EMPREGOS',
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+      ),
+    ],
+  );
 }
 
 class _JobsHeader extends StatelessWidget {
@@ -533,6 +499,7 @@ class _JobCard extends StatelessWidget {
     required this.feedback,
     required this.timeWarning,
     required this.boostWarning,
+    required this.rootCherriesInfinite,
     required this.confirmingBoost,
     required this.onToggle,
     required this.onBoostPrompt,
@@ -550,6 +517,7 @@ class _JobCard extends StatelessWidget {
   final JobFeedbackRecord? feedback;
   final String? timeWarning;
   final String? boostWarning;
+  final bool rootCherriesInfinite;
   final bool confirmingBoost;
   final VoidCallback onToggle;
   final VoidCallback onBoostPrompt;
@@ -558,6 +526,17 @@ class _JobCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return _CompactJobCard(
+      job: job,
+      progress: progress,
+      state: state,
+      now: now,
+      unlocked: unlocked,
+      timeWarning: timeWarning,
+      rootCherriesInfinite: rootCherriesInfinite,
+      onToggle: onToggle,
+      onUpgrade: onBoostConfirm,
+    );
     final active = progress.active;
     final maximumLevel = progress.level >= job.maximumLevel;
     final paused = !active && progress.hasBeenStarted;
@@ -735,6 +714,152 @@ class _JobCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _CompactJobCard extends StatelessWidget {
+  const _CompactJobCard({
+    required this.job,
+    required this.progress,
+    required this.state,
+    required this.now,
+    required this.unlocked,
+    required this.timeWarning,
+    required this.rootCherriesInfinite,
+    required this.onToggle,
+    required this.onUpgrade,
+  });
+  final JobDefinition job;
+  final ActivityProgress progress;
+  final IdleState state;
+  final DateTime now;
+  final bool unlocked;
+  final String? timeWarning;
+  final bool rootCherriesInfinite;
+  final VoidCallback onToggle;
+  final VoidCallback onUpgrade;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = progress.active;
+    final accent = const Color(0xFF70A77C);
+    final progressValue = unlocked
+        ? ActivityRuntimeService.jobCycleProgress(
+            job: job,
+            progress: progress,
+            state: state,
+            now: now,
+          )
+        : 0.0;
+    final requirement = JobRequirementEvaluator.evaluate(state, job);
+    return GestureDetector(
+      onTap: unlocked ? onToggle : null,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: active
+              ? accent.withValues(alpha: .24)
+              : const Color(0xFFFFFCF6),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: active ? accent : const Color(0xFF5B4351),
+            width: active ? 2 : 1.2,
+          ),
+          boxShadow: const [
+            BoxShadow(color: Color(0x305B4351), offset: Offset(0, 3)),
+          ],
+        ),
+        child: unlocked
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          job.displayName.toUpperCase(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                      ActivityUpgradeButton(
+                        activityName: job.displayName,
+                        activityKindLabel: 'Emprego',
+                        upgraded: progress.upgraded,
+                        canAfford:
+                            rootCherriesInfinite ||
+                            state.diamonds >=
+                                IdleBalance.activityUpgradeCherryCost,
+                        onConfirm: () async => onUpgrade(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Nv. ${progress.level}',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  const Spacer(),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: progress.level >= job.maximumLevel
+                          ? 1
+                          : progressValue,
+                      minHeight: 10,
+                      color: accent,
+                      backgroundColor: const Color(0xFFE8DDCF),
+                    ),
+                  ),
+                  if (timeWarning != null) ...[
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Tempo insuficiente.',
+                      style: TextStyle(
+                        color: GameColors.warning,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ],
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.lock_rounded, size: 18),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          job.displayName.toUpperCase(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Text(
+                    requirement.requirements.isEmpty
+                        ? 'Indisponível'
+                        : requirement.requirements.first.progressLabel,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
       ),
     );
   }
@@ -1139,7 +1264,6 @@ class _JobFeedbackPanel extends StatelessWidget {
   }
 }
 
-// ignore: unused_element
 class _JobActionButton extends StatelessWidget {
   const _JobActionButton({
     required this.job,
@@ -1208,7 +1332,6 @@ class _JobActionButton extends StatelessWidget {
   }
 }
 
-// ignore: unused_element
 class _JobBoostPanel extends StatelessWidget {
   const _JobBoostPanel({
     required this.job,

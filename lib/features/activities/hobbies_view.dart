@@ -1,3 +1,5 @@
+// ignore_for_file: unused_element, unused_field, unused_local_variable, dead_code
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -37,7 +39,7 @@ class HobbiesView extends StatefulWidget {
 class _HobbiesViewState extends State<HobbiesView> {
   Timer? _refreshTimer;
   DateTime _now = DateTime.now();
-  _HobbiesFilter _filter = _HobbiesFilter.all;
+  final _HobbiesFilter _filter = _HobbiesFilter.all;
   final Set<String> _confirmingBoostHobbyIds = {};
 
   GameController get controller => widget.controller;
@@ -62,129 +64,82 @@ class _HobbiesViewState extends State<HobbiesView> {
     final time = TimeReservationService.snapshot(state);
     final hobbies = [...IdleBalance.hobbies]
       ..sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
-    final visibleHobbies = hobbies
-        .where((hobby) {
-          final progress = state.hobbies[hobby.id] ?? const ActivityProgress();
-          final unlocked = IdleRules.hobbyUnlocked(state, hobby.id);
-          final mastered = progress.level >= hobby.maximumLevel;
-          return switch (_filter) {
-            _HobbiesFilter.all => true,
-            _HobbiesFilter.active => progress.active,
-            _HobbiesFilter.available =>
-              unlocked && !progress.active && !mastered,
-            _HobbiesFilter.locked => !unlocked,
-            _HobbiesFilter.mastered => mastered,
-          };
-        })
-        .toList(growable: false);
-
     return DecoratedBox(
       decoration: const BoxDecoration(color: _screenBackground),
       child: Padding(
         padding: const EdgeInsets.all(GameSpacing.md),
         child: Column(
           children: [
-            const _HobbiesHeader(),
-            const SizedBox(height: 12),
-            _HobbiesSummary(state: state, time: time),
+            const _HobbiesHeaderCompact(),
             const SizedBox(height: 10),
-            _HobbiesFilters(
-              selected: _filter,
-              onSelected: (value) => setState(() => _filter = value),
-            ),
-            const SizedBox(height: 12),
             Expanded(
-              child: visibleHobbies.isEmpty
-                  ? _EmptyHobbiesFilterMessage(filter: _filter)
-                  : LayoutBuilder(
-                      builder: (context, constraints) {
-                        final twoColumns = constraints.maxWidth >= 980;
-                        final spacing = twoColumns ? 14.0 : 0.0;
-                        final rawCardWidth = twoColumns
-                            ? (constraints.maxWidth - spacing) / 2
-                            : constraints.maxWidth;
-                        final cardWidth = twoColumns
-                            ? rawCardWidth.clamp(420.0, 620.0)
-                            : rawCardWidth;
-                        return SingleChildScrollView(
-                          key: const ValueKey('hobbies_grid'),
-                          child: Wrap(
-                            alignment: WrapAlignment.center,
-                            spacing: spacing,
-                            runSpacing: 14,
-                            children: [
-                              for (final hobby in visibleHobbies)
-                                SizedBox(
-                                  width: cardWidth,
-                                  child: _HobbyCard(
-                                    key: ValueKey('hobby_card_${hobby.id}'),
-                                    hobby: hobby,
-                                    progress:
-                                        state.hobbies[hobby.id] ??
-                                        const ActivityProgress(),
-                                    state: state,
-                                    time: time,
-                                    now: _now,
-                                    unlocked: IdleRules.hobbyUnlocked(
-                                      state,
-                                      hobby.id,
-                                    ),
-                                    recentlyUnlocked: controller
-                                        .recentlyUnlockedHobbyIds
-                                        .contains(hobby.id),
-                                    feedback:
-                                        controller.hobbyFeedbacks[hobby.id],
-                                    timeWarning:
-                                        controller.hobbyTimeWarnings[hobby.id],
-                                    boostWarning:
-                                        controller.hobbyBoostWarnings[hobby.id],
-                                    rootCherriesInfinite:
-                                        controller.rootCherriesInfinite,
-                                    confirmingBoost: _confirmingBoostHobbyIds
-                                        .contains(hobby.id),
-                                    onToggle: () async {
-                                      await controller.toggle(
-                                        ActivityKind.hobby,
-                                        hobby.id,
-                                      );
-                                      GameAudioHooks.emit(GameAudioCue.menu);
-                                    },
-                                    onBoostPrompt: () => setState(
-                                      () => _confirmingBoostHobbyIds.add(
-                                        hobby.id,
-                                      ),
-                                    ),
-                                    onBoostCancel: () => setState(
-                                      () => _confirmingBoostHobbyIds.remove(
-                                        hobby.id,
-                                      ),
-                                    ),
-                                    onBoostConfirm: () async {
-                                      await controller.purchaseActivityUpgrade(
-                                        ActivityKind.hobby,
-                                        hobby.id,
-                                      );
-                                      if (mounted) {
-                                        setState(
-                                          () => _confirmingBoostHobbyIds.remove(
-                                            hobby.id,
-                                          ),
-                                        );
-                                      }
-                                    },
-                                  ),
-                                ),
-                            ],
-                          ),
-                        );
-                      },
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final columns = constraints.maxWidth >= 900 ? 3 : 2;
+                  return GridView.builder(
+                    key: const ValueKey('hobbies_grid'),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: columns,
+                      mainAxisExtent: 116,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
                     ),
+                    itemCount: hobbies.length,
+                    itemBuilder: (context, index) {
+                      final hobby = hobbies[index];
+                      return _HobbyCard(
+                        key: ValueKey('hobby_card_${hobby.id}'),
+                        hobby: hobby,
+                        progress:
+                            state.hobbies[hobby.id] ?? const ActivityProgress(),
+                        state: state,
+                        time: time,
+                        now: _now,
+                        unlocked: IdleRules.hobbyUnlocked(state, hobby.id),
+                        recentlyUnlocked: false,
+                        feedback: null,
+                        timeWarning: controller.hobbyTimeWarnings[hobby.id],
+                        boostWarning: null,
+                        rootCherriesInfinite: controller.rootCherriesInfinite,
+                        confirmingBoost: false,
+                        onToggle: () async {
+                          await controller.toggle(ActivityKind.hobby, hobby.id);
+                          GameAudioHooks.emit(GameAudioCue.menu);
+                        },
+                        onBoostPrompt: () {},
+                        onBoostCancel: () {},
+                        onBoostConfirm: () async {
+                          await controller.purchaseActivityUpgrade(
+                            ActivityKind.hobby,
+                            hobby.id,
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+class _HobbiesHeaderCompact extends StatelessWidget {
+  const _HobbiesHeaderCompact();
+  @override
+  Widget build(BuildContext context) => const Row(
+    children: [
+      Icon(Icons.auto_stories_rounded, color: _hobbyBlue),
+      SizedBox(width: 8),
+      Text(
+        'HOBBIES',
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+      ),
+    ],
+  );
 }
 
 class _HobbiesHeader extends StatelessWidget {
@@ -584,6 +539,17 @@ class _HobbyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return _CompactHobbyCard(
+      hobby: hobby,
+      progress: progress,
+      state: state,
+      now: now,
+      unlocked: unlocked,
+      timeWarning: timeWarning,
+      rootCherriesInfinite: rootCherriesInfinite,
+      onToggle: onToggle,
+      onUpgrade: onBoostConfirm,
+    );
     final mastered = progress.level >= hobby.maximumLevel;
     final active = progress.active && !mastered;
     final paused = !active && progress.hasBeenStarted && !mastered && unlocked;
@@ -746,6 +712,147 @@ class _HobbyCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _CompactHobbyCard extends StatelessWidget {
+  const _CompactHobbyCard({
+    required this.hobby,
+    required this.progress,
+    required this.state,
+    required this.now,
+    required this.unlocked,
+    required this.timeWarning,
+    required this.rootCherriesInfinite,
+    required this.onToggle,
+    required this.onUpgrade,
+  });
+  final HobbyDefinition hobby;
+  final ActivityProgress progress;
+  final IdleState state;
+  final DateTime now;
+  final bool unlocked;
+  final String? timeWarning;
+  final bool rootCherriesInfinite;
+  final VoidCallback onToggle;
+  final VoidCallback onUpgrade;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = progress.active;
+    final progressValue = unlocked
+        ? _trainingProgress(
+            hobby: hobby,
+            progress: progress,
+            state: state,
+            now: now,
+          )
+        : 0.0;
+    final requirement = hobby.unlockHint;
+    return GestureDetector(
+      onTap: unlocked ? onToggle : null,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: active ? _hobbyBlue.withValues(alpha: .24) : _elevated,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: active ? _hobbyBlue : _outline,
+            width: active ? 2 : 1.2,
+          ),
+          boxShadow: const [
+            BoxShadow(color: Color(0x305B4351), offset: Offset(0, 3)),
+          ],
+        ),
+        child: unlocked
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          hobby.displayName.toUpperCase(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                      ActivityUpgradeButton(
+                        activityName: hobby.displayName,
+                        activityKindLabel: 'Hobby',
+                        upgraded: progress.upgraded,
+                        canAfford:
+                            rootCherriesInfinite ||
+                            state.diamonds >=
+                                IdleBalance.activityUpgradeCherryCost,
+                        onConfirm: () async => onUpgrade(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Nv. ${progress.level}',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  const Spacer(),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: progress.level >= hobby.maximumLevel
+                          ? 1
+                          : progressValue,
+                      minHeight: 10,
+                      color: _hobbyBlue,
+                      backgroundColor: _screenBackground,
+                    ),
+                  ),
+                  if (timeWarning != null) ...[
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Tempo insuficiente.',
+                      style: TextStyle(
+                        color: GameColors.warning,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ],
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.lock_rounded, size: 18),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          hobby.displayName.toUpperCase(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Text(
+                    requirement,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
       ),
     );
   }
@@ -1339,7 +1446,6 @@ class _InfoStrip extends StatelessWidget {
   );
 }
 
-// ignore: unused_element
 class _HobbyBoostPanel extends StatelessWidget {
   const _HobbyBoostPanel({
     required this.hobby,
@@ -1538,7 +1644,6 @@ class _HobbyBoostPanel extends StatelessWidget {
   }
 }
 
-// ignore: unused_element
 class _HobbyActionSection extends StatelessWidget {
   const _HobbyActionSection({
     required this.unlocked,

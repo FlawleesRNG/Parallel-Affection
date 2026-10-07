@@ -58,17 +58,18 @@ void main() {
         expect(find.byKey(const ValueKey('hobbies_grid')), findsOneWidget);
         expect(find.text('LEITURA'), findsOneWidget);
         expect(find.text('ACADEMIA'), findsOneWidget);
+        expect(find.text('Nv. 1'), findsWidgets);
         expect(
           find.text(
             'Treine habilidades, descubra interesses e desenvolva seu potencial.',
           ),
-          findsOneWidget,
+          findsNothing,
         );
-        expect(find.text('Ativos'), findsWidgets);
-        expect(find.text('Tempo livre'), findsOneWidget);
-        expect(find.text('Dominados'), findsWidgets);
-        expect(find.text('Nível total'), findsOneWidget);
-        expect(find.textContaining('Toque no card para iniciar'), findsWidgets);
+        expect(find.text('Ativos'), findsNothing);
+        expect(find.text('Tempo livre'), findsNothing);
+        expect(find.text('Dominados'), findsNothing);
+        expect(find.text('Nível total'), findsNothing);
+        expect(find.textContaining('Toque no card para iniciar'), findsNothing);
         expect(tester.takeException(), isNull);
       },
     );
@@ -92,7 +93,7 @@ void main() {
     },
   );
 
-  testWidgets('filtros definitivos mostram estados corretos dos Hobbies', (
+  testWidgets('cards compactos mantêm atividades e bloqueios visíveis', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -107,22 +108,11 @@ void main() {
     await tester.pump();
 
     expect(_hobbyCardCount(), findsNWidgets(10));
-
-    await tester.tap(find.text('Ativos').last);
-    await tester.pump(const Duration(milliseconds: 200));
     expect(find.byKey(const ValueKey('hobby_card_leitura')), findsOneWidget);
-    expect(_hobbyCardCount(), findsOneWidget);
-
-    await tester.tap(find.text('Bloqueados').last);
-    await tester.pump(const Duration(milliseconds: 200));
-    expect(_hobbyCardCount(), findsNWidgets(5));
     expect(find.byKey(const ValueKey('hobby_card_musica')), findsOneWidget);
-    expect(find.textContaining('Leitura — Nível'), findsWidgets);
-
-    await tester.tap(find.text('Dominados').last);
-    await tester.pump(const Duration(milliseconds: 200));
     expect(find.byKey(const ValueKey('hobby_card_academia')), findsOneWidget);
-    expect(find.text('HABILIDADE DOMINADA'), findsWidgets);
+    expect(find.byIcon(Icons.lock_rounded), findsWidgets);
+    expect(find.text('Nv. 10'), findsOneWidget);
   });
 }
 

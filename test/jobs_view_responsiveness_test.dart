@@ -54,16 +54,18 @@ void main() {
       await tester.pump();
 
       expect(find.text('EMPREGOS'), findsOneWidget);
+      expect(find.byKey(const ValueKey('jobs_grid')), findsOneWidget);
       expect(
-        find.text('Trabalhe, evolua e construa sua independência.'),
+        find.byKey(const ValueKey('job_card_neighborhood_deliveries')),
         findsOneWidget,
       );
-      expect(find.text('Todos'), findsOneWidget);
-      expect(find.text('Ativos'), findsWidgets);
-      expect(find.text('Disponíveis'), findsOneWidget);
-      expect(find.text('Bloqueados'), findsOneWidget);
-      expect(find.text('Nível máximo'), findsOneWidget);
-      expect(find.byKey(const ValueKey('jobs_grid')), findsOneWidget);
+      expect(find.text('Nv. 1'), findsWidgets);
+      expect(
+        find.text('Trabalhe, evolua e construa sua independência.'),
+        findsNothing,
+      );
+      expect(find.text('Todos'), findsNothing);
+      expect(find.text('Ativos'), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
